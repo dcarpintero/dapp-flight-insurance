@@ -1,18 +1,22 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.6.0;
+pragma solidity ^0.6.2;
 
 import "@openzeppelin/contracts/math/SafeMath.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
 
-contract FlightSuretyData {
+contract FlightSuretyData is Ownable, AccessControl {
     using SafeMath for uint256;
 
     /********************************************************************************************/
     /*                                       DATA VARIABLES                                     */
     /********************************************************************************************/
+    bytes32 public constant AIRLINE_ROLE = keccak256("AIRLINE_ROLE");
+    bytes32 public constant INSUREE_ROLE = keccak256("INSUREE_ROLE");
 
-    address private contractOwner; // Account used to deploy contract
-    bool private operational = true; // Blocks all state changes throughout the contract if false
+    address private contractOwner;
+    bool private operational = true;
 
     /********************************************************************************************/
     /*                                       EVENT DEFINITIONS                                  */
@@ -20,36 +24,42 @@ contract FlightSuretyData {
 
     /**
      * @dev Constructor
-     *      The deploying account becomes contractOwner
      */
     constructor() public {
-        contractOwner = msg.sender;
+        _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
 
     /********************************************************************************************/
     /*                                       FUNCTION MODIFIERS                                 */
     /********************************************************************************************/
 
-    // Modifiers help avoid duplication of code. They are typically used to validate something
-    // before a function is allowed to be executed.
-
     /**
-     * @dev Modifier that requires the "operational" boolean variable to be "true"
-     *      This is used on all state changing functions to pause the contract in
+     * @dev used on all state changing functions to pause the contract in
      *      the event there is an issue that needs to be fixed
      */
-    modifier requireIsOperational() {
-        require(operational, "Contract is currently not operational");
-        _; // All modifiers require an "_" which indicates where the function body will be added
+    modifier onlyOperational() {
+        require(isOperational(), "Contract is currently not operational");
+        _;
+    }
+
+    modifier onlyAirline() {
+        require(hasRole(AIRLINE_ROLE, msg.sender), "Caller is not an airline");
+        _;
+    }
+
+    modifier onlyInsuree() {
+        require(hasRole(INSUREE_ROLE, msg.sender), "Caller is not insuree");
+        _;
     }
 
     /**
      * @dev Modifier that requires the "ContractOwner" account to be the function caller
      */
-    modifier requireContractOwner() {
+    /*
+    modifier onlyContractOwner() {
         require(msg.sender == contractOwner, "Caller is not contract owner");
         _;
-    }
+    }*/
 
     /********************************************************************************************/
     /*                                       UTILITY FUNCTIONS                                  */
@@ -70,8 +80,12 @@ contract FlightSuretyData {
      *
      * When operational mode is disabled, all write transactions except for this one will fail
      */
+    /*
+    function setOperatingStatus(bool mode) external onlyContractOwner {
+        operational = mode;
+    }*/
 
-    function setOperatingStatus(bool mode) external requireContractOwner {
+    function setOperatingStatus(bool mode) external onlyOwner {
         operational = mode;
     }
 
@@ -128,7 +142,7 @@ contract FlightSuretyData {
     fallback() external payable {
         require(
             msg.data.length == 0,
-            "fallback function only to receive ether"
+            "Fallback function only to receive ether"
         );
         fund();
     }
