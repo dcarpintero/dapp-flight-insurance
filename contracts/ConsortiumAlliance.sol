@@ -1,0 +1,392 @@
+// SPDX-License-Identifier: MIT
+
+pragma solidity ^0.6.2;
+
+import "@openzeppelin/contracts/math/SafeMath.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/payment/PullPayment.sol";
+
+/**
+ * @dev Contract module for the provision of a generic Consortium data model
+ *      and fine CRUD operations.
+ *
+ *      - Approval of new affiliates is automatic up to the fourth entity and
+ *        requires consortium consensus for the next ones.
+ *
+ *      - Approved affiliates shall satisfy a consortium fee to become fully
+ *        members of the consortium and adquire voting rights.
+ *
+ *      - Voting rights apply to membership requests and operational status.
+ *
+ *      - Operational status allows the contract to be stop and resumed.
+ *
+ *      - Consortium issues keys representing insurance capital
+ *        for a deposit credited to a custody fund (escrow).
+ *
+ *      - insurance capital == insurance deposit * premium factor.
+ *
+ *      - The insurance capital shall never exceed the consortium funds.
+ *
+ *      - consortium funds == affiliates deposit + insurance credits + escrow.
+ *
+ *      - Unredeemable insurance_capital results in the insurance_deposit
+ *        being credited to the consortium.
+ *
+ *      - Reedemable insurance capital results in the insurance premium being
+ *        transferred to an admin contract
+ *        from the consortium balance and escrow balance.
+ *
+ */
+contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
+    using SafeMath for uint256;
+
+    bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
+    bytes32 public constant CONSORTIUM_ROLE = keccak256("CONSORTIUM_ROLE");
+
+    uint256 public constant CONSORTIUM_MEMBERSHIP_FEE = 10 ether;
+    uint256 public constant CONSORTIUM_CONSENSUS = 50;
+
+    uint256 public constant INSURANCE_MAX_FEE = 1 ether;
+    uint256 public constant INSURANCE_PREMIUM = 1.5 ether;
+
+    // ----------------- CONSORTIUM -----------------
+    struct OperationalConsensus {
+        bool status;
+        uint256 totalON;
+        uint256 totalOFF;
+        mapping(address => bool) votes;
+    }
+
+    // sum(balance, escrow) == contract balance
+    struct Consortium {
+        uint256 balance;
+        uint256 escrow;
+        uint256 members;
+        OperationalConsensus operational;
+    }
+    Consortium private consortium;
+
+    // ----------------- AFFILIATE -----------------
+    enum MembershipStatus {REGISTERED, APPROVED, SEED_FUNDED, SUSPENDED}
+
+    struct Affiliate {
+        MembershipStatus status;
+        uint256 seed;
+        uint256 updatedTimestamp;
+        string title;
+        uint256 approvals;
+        mapping(address => bool) votes;
+    }
+    mapping(address => Affiliate) private affiliates;
+
+    // ----------------- INSURANCE CAPITAL -----------------
+    mapping(bytes32 => uint256) private insuranceDeposit;
+
+    // ----------------- EVENTS ----------------- //
+    event AffiliateRegistered(address indexed affiliate, string title);
+    event AffiliateApproved(address indexed affiliate, string title);
+    event AffiliateFunded(
+        address indexed affiliate,
+        string title,
+        uint256 deposit
+    );
+
+    event ConsortiumFunded(address indexed affiliate, uint256 deposit);
+    event ConsortiumCredited(uint256 credit);
+    event ConsortiumDebited(uint256 debit);
+
+    event InsuranceDepositRegistered(bytes32 key, uint256 deposit);
+    event InsuranceDepositCredited(bytes32 key, uint256 credit);
+    event InsuranceDepositWithdrawn(bytes32 key, uint256 debit);
+
+    // ----------------- MODIFIERS -----------------
+    modifier stopLoss() {
+        require(
+            address(this).balance == (consortium.balance + consortium.escrow),
+            "Unexpected contract balance"
+        );
+        _;
+    }
+
+    modifier onlyGuaranteeCapital() {
+        require(
+            address(this).balance > consortium.escrow.mul(INSURANCE_PREMIUM),
+            "Consortium balance does not guarantee insurance premium"
+        );
+        _;
+    }
+
+    modifier onlyOperational() {
+        require(isOperational(), "Contract is currently not operational");
+        _;
+    }
+
+    modifier onlyAdmin() {
+        require(hasRole(ADMIN_ROLE, msg.sender), "Caller is not Admin");
+        _;
+    }
+
+    modifier onlyConsortium() {
+        require(
+            hasRole(CONSORTIUM_ROLE, msg.sender),
+            "Caller is not a consortium Affiliate"
+        );
+        _;
+    }
+
+    modifier onlyConsortiumFee() {
+        require(
+            msg.value == CONSORTIUM_MEMBERSHIP_FEE,
+            "Unexpected consortium fee"
+        );
+        _;
+    }
+
+    modifier onlyInsurance() {
+        require(msg.value <= INSURANCE_MAX_FEE, "Unexpected insurance deposit");
+        _;
+    }
+
+    /**
+     * @dev Constructor
+     */
+    constructor() public {
+        _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        // register first Affiliate as consortium founder
+    }
+
+    // ----------------- OPERATIONAL CONSENSUS -----------------
+
+    function isOperational() public view returns (bool) {
+        return consortium.operational.status;
+    }
+
+    /**
+     * @dev Vote to pause contract operations
+     */
+    function suspendService() public onlyConsortium {
+        _setOperationalConsensus(msg.sender, false);
+    }
+
+    /**
+     * @dev Vote to resume contract operations
+     */
+    function resumeService() public onlyConsortium {
+        _setOperationalConsensus(msg.sender, true);
+    }
+
+    function _setTotalON(uint256 _value) internal {
+        consortium.operational.totalON = _value;
+    }
+
+    function _setTotalOFF(uint256 _value) internal {
+        consortium.operational.totalOFF = _value;
+    }
+
+    function _setOperationalConsensus(address voter, bool vote) private {
+        require(consortium.operational.votes[voter] != vote);
+
+        if (vote == true) {
+            _setTotalON(consortium.operational.totalON.add(1));
+            _setTotalOFF(consortium.operational.totalOFF.sub(1));
+        }
+        if (vote == false) {
+            _setTotalON(consortium.operational.totalON.sub(1));
+            _setTotalOFF(consortium.operational.totalOFF.add(1));
+        }
+
+        if (
+            consortium.operational.totalON.div(consortium.members).mul(100) >=
+            CONSORTIUM_CONSENSUS
+        ) {
+            consortium.operational.status = true;
+        }
+
+        if (
+            consortium.operational.totalOFF.div(consortium.members).mul(100) >
+            CONSORTIUM_CONSENSUS
+        ) {
+            consortium.operational.status = false;
+        }
+
+        consortium.operational.votes[voter] = vote;
+    }
+
+    // ----------------- AFFILIATES -----------------
+
+    /**
+     * @dev Let Admin add an Affiliate to the registration queue
+     */
+    function createAffiliate(address _affiliate, string memory _title)
+        public
+        onlyAdmin
+        onlyOperational
+    {
+        require(_affiliate != address(0));
+
+        affiliates[_affiliate] = Affiliate({
+            status: MembershipStatus.REGISTERED,
+            seed: 0,
+            approvals: 0,
+            updatedTimestamp: block.timestamp,
+            title: _title
+        });
+
+        _updateMembershipStatus(_affiliate);
+        _setOperationalConsensus(_affiliate, true);
+
+        emit AffiliateRegistered(_affiliate, _title);
+    }
+
+    /**
+     * @dev Let a consortium Affiliate vote for a registered candidate.
+     */
+    function approveAffiliate(address _affiliate)
+        public
+        onlyConsortium
+        onlyOperational
+    {
+        require(msg.sender != _affiliate);
+        require(!affiliates[_affiliate].votes[msg.sender]);
+        require(affiliates[_affiliate].status == MembershipStatus.REGISTERED);
+
+        affiliates[_affiliate].votes[msg.sender] = true;
+        affiliates[_affiliate].approvals = affiliates[_affiliate].approvals.add(
+            1
+        );
+        _updateMembershipStatus(_affiliate);
+    }
+
+    function _updateMembershipStatus(address _affiliate) private {
+        if (_hasReachedConsortiumConsensus(_affiliate)) {
+            affiliates[_affiliate].status = MembershipStatus.APPROVED;
+            affiliates[_affiliate].updatedTimestamp = block.timestamp;
+
+            _setupRole(CONSORTIUM_ROLE, _affiliate);
+            consortium.members = consortium.members.add(1);
+
+            emit AffiliateApproved(_affiliate, affiliates[_affiliate].title);
+        }
+    }
+
+    function _hasReachedConsortiumConsensus(address _affiliate)
+        private
+        view
+        returns (bool)
+    {
+        uint256 approvalVotes = affiliates[_affiliate].approvals;
+
+        return
+            (consortium.members <= 4) ||
+            (approvalVotes.div(consortium.members).mul(100) >=
+                CONSORTIUM_CONSENSUS);
+    }
+
+    // ----------------- INSURANCE CAPITAL AND PREMIUMS -----------------
+    function depositMebership()
+        public
+        payable
+        onlyConsortium
+        onlyConsortiumFee
+        onlyOperational
+    {
+        _creditAffiliate(msg.sender, msg.value);
+        _creditConsortium(msg.value);
+        affiliates[msg.sender].status = MembershipStatus.SEED_FUNDED;
+
+        emit AffiliateFunded(
+            msg.sender,
+            affiliates[msg.sender].title,
+            msg.value
+        );
+    }
+
+    function fundConsortium() public payable onlyConsortium onlyOperational {
+        _creditAffiliate(msg.sender, msg.value);
+        _creditConsortium(msg.value);
+    }
+
+    /**
+     * @dev Lets Admin register insurance deposit in a escrow fund, only if the
+     *      consortium balance would be enough to pay the premium.
+     */
+    function depositInsurance()
+        public
+        payable
+        onlyInsurance
+        onlyGuaranteeCapital
+        onlyAdmin
+        onlyOperational
+        returns (bytes32)
+    {
+        bytes32 key = keccak256(abi.encodePacked(msg.sender, block.timestamp));
+        insuranceDeposit[key] = msg.value;
+
+        _creditEscrow(msg.value);
+
+        emit InsuranceDepositRegistered(key, msg.value);
+        return key;
+    }
+
+    /**
+     * @dev Lets Admin credit consortium a non-reedemable insurance deposit.
+     */
+    function creditInsurance(bytes32 _key) public onlyAdmin onlyOperational {
+        uint256 credit = insuranceDeposit[_key];
+
+        _debitEscrow(credit);
+        _creditConsortium(credit);
+    }
+
+    /**
+     * @dev Credits Admin with the registered insurance premium, only if the
+     *      contract balance equals the consortium and escrow balance (StopLoss).
+     */
+    function withdrawInsurance(bytes32 key)
+        public
+        stopLoss
+        onlyAdmin
+        onlyOperational
+    {
+        uint256 deposit = insuranceDeposit[key];
+        uint256 premium = deposit.mul(INSURANCE_PREMIUM);
+        // should always be true
+        require(consortium.balance.add(consortium.escrow) >= premium);
+
+        _debitEscrow(deposit);
+        _debitConsortium(premium.sub(deposit));
+
+        _asyncTransfer(msg.sender, premium);
+    }
+
+    function _creditAffiliate(address _key, uint256 credit) internal {
+        affiliates[_key].seed = affiliates[_key].seed.add(credit);
+    }
+
+    function _creditConsortium(uint256 credit) internal {
+        consortium.balance = consortium.balance.add(credit);
+        emit ConsortiumCredited(credit);
+    }
+
+    function _debitConsortium(uint256 debit) internal {
+        consortium.balance = consortium.balance.sub(debit);
+        emit ConsortiumDebited(debit);
+    }
+
+    function _creditEscrow(uint256 credit) internal {
+        consortium.escrow = consortium.escrow.add(credit);
+    }
+
+    function _debitEscrow(uint256 debit) internal {
+        consortium.escrow = consortium.escrow.sub(debit);
+    }
+
+    /**
+     * @dev Fallback function - does not accept unexpected funding.
+     *
+     */
+    fallback() external {
+        require(msg.data.length == 0);
+    }
+}
