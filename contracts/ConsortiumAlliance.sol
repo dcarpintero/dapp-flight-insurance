@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.6.2;
+pragma solidity 0.6.2;
 
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -8,8 +8,8 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/payment/PullPayment.sol";
 
 /**
- * @dev Contract module for the provision of a generic Consortium data model
- *      and fine CRUD operations.
+ * @title ConsortiumAlliance
+ * @dev Provides a generic Consortium data model and fine CRUD operations.
  *
  *      - Approval of new affiliates is automatic up to the fourth entity and
  *        requires consortium consensus for the next ones.
@@ -37,6 +37,13 @@ import "@openzeppelin/contracts/payment/PullPayment.sol";
  *        transferred to an admin contract
  *        from the consortium balance and escrow balance.
  *
+ * Intended usage:
+ *      - Consortium affiliates fund insurance capital and agree on new members
+ *        and operational status.
+ *
+ *      - Admin (contract owner) handles insurance capital and insurance premium
+ *        for distribution to insurees according to the business rules.
+ *
  */
 contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
     using SafeMath for uint256;
@@ -58,7 +65,6 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
         mapping(address => bool) votes;
     }
 
-    // sum(balance, escrow) == contract balance
     struct Consortium {
         uint256 balance;
         uint256 escrow;
@@ -84,26 +90,38 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
     mapping(bytes32 => uint256) private insuranceDeposit;
 
     // ----------------- EVENTS ----------------- //
-    event AffiliateRegistered(address indexed affiliate, string title);
-    event AffiliateApproved(address indexed affiliate, string title);
-    event AffiliateFunded(
+    event LogAffiliateRegistered(address indexed affiliate, string title);
+    event LogAffiliateApproved(address indexed affiliate, string title);
+    event LogAffiliateFunded(
         address indexed affiliate,
         string title,
         uint256 deposit
     );
 
-    event ConsortiumFunded(address indexed affiliate, uint256 deposit);
-    event ConsortiumCredited(uint256 credit);
-    event ConsortiumDebited(uint256 debit);
+    event LogConsortiumFunded(address indexed affiliate, uint256 deposit);
+    event LogConsortiumCredited(uint256 credit);
+    event LogConsortiumDebited(uint256 debit);
 
-    event InsuranceDepositRegistered(bytes32 key, uint256 deposit);
-    event InsuranceDepositCredited(bytes32 key, uint256 credit);
-    event InsuranceDepositWithdrawn(bytes32 key, uint256 debit);
+    event LogEscrowCredited(uint256 credit);
+    event LogEscrowDebited(uint256 debit);
+
+    event LogInsuranceDepositRegistered(bytes32 key, uint256 deposit);
+    event LogInsuranceDepositCredited(bytes32 key, uint256 credit);
+    event LogInsuranceDepositWithdrawn(bytes32 key, uint256 debit);
 
     // ----------------- MODIFIERS -----------------
+
+    /**
+     * @dev StopLoss if the contract balance is unexpected.
+     *
+     * WARNING: not a strict equality of the balance because the contract can be
+     * forcibly sent ether without going through the deposit() function!
+     *
+     * https://consensys.github.io/smart-contract-best-practices/recommendations
+     */
     modifier stopLoss() {
         require(
-            address(this).balance == (consortium.balance + consortium.escrow),
+            address(this).balance >= (consortium.balance + consortium.escrow),
             "Unexpected contract balance"
         );
         _;
@@ -124,6 +142,14 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
 
     modifier onlyAdmin() {
         require(hasRole(ADMIN_ROLE, msg.sender), "Caller is not Admin");
+        _;
+    }
+
+    modifier onlyApprovedAffiliate() {
+        require(
+            affiliates[msg.sender].status == MembershipStatus.APPROVED,
+            "Caller is not an approved affiliate"
+        );
         _;
     }
 
@@ -152,8 +178,7 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
      * @dev Constructor
      */
     constructor() public {
-        _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        // register first Affiliate as consortium founder
+        _setupRole(ADMIN_ROLE, msg.sender);
     }
 
     // ----------------- OPERATIONAL CONSENSUS -----------------
@@ -236,20 +261,26 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
         _updateMembershipStatus(_affiliate);
         _setOperationalConsensus(_affiliate, true);
 
-        emit AffiliateRegistered(_affiliate, _title);
+        emit LogAffiliateRegistered(_affiliate, _title);
     }
 
     /**
-     * @dev Let a consortium Affiliate vote for a registered candidate.
+     * @dev Let a Consortium Affiliate vote for a registered candidate.
      */
     function approveAffiliate(address _affiliate)
         public
         onlyConsortium
         onlyOperational
     {
-        require(msg.sender != _affiliate);
-        require(!affiliates[_affiliate].votes[msg.sender]);
-        require(affiliates[_affiliate].status == MembershipStatus.REGISTERED);
+        require(msg.sender != _affiliate, "Caller cannot vote for itself.");
+        require(
+            !affiliates[_affiliate].votes[msg.sender],
+            "Caller cannot vote twice."
+        );
+        require(
+            affiliates[_affiliate].status == MembershipStatus.REGISTERED,
+            "Caller can only vote for registered affiliates."
+        );
 
         affiliates[_affiliate].votes[msg.sender] = true;
         affiliates[_affiliate].approvals = affiliates[_affiliate].approvals.add(
@@ -263,10 +294,9 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
             affiliates[_affiliate].status = MembershipStatus.APPROVED;
             affiliates[_affiliate].updatedTimestamp = block.timestamp;
 
-            _setupRole(CONSORTIUM_ROLE, _affiliate);
             consortium.members = consortium.members.add(1);
 
-            emit AffiliateApproved(_affiliate, affiliates[_affiliate].title);
+            emit LogAffiliateApproved(_affiliate, affiliates[_affiliate].title);
         }
     }
 
@@ -287,15 +317,16 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
     function depositMebership()
         public
         payable
-        onlyConsortium
+        onlyApprovedAffiliate
         onlyConsortiumFee
         onlyOperational
     {
         _creditAffiliate(msg.sender, msg.value);
         _creditConsortium(msg.value);
         affiliates[msg.sender].status = MembershipStatus.SEED_FUNDED;
+        _setupRole(CONSORTIUM_ROLE, msg.sender);
 
-        emit AffiliateFunded(
+        emit LogAffiliateFunded(
             msg.sender,
             affiliates[msg.sender].title,
             msg.value
@@ -325,7 +356,7 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
 
         _creditEscrow(msg.value);
 
-        emit InsuranceDepositRegistered(key, msg.value);
+        emit LogInsuranceDepositRegistered(key, msg.value);
         return key;
     }
 
@@ -366,20 +397,22 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
 
     function _creditConsortium(uint256 credit) internal {
         consortium.balance = consortium.balance.add(credit);
-        emit ConsortiumCredited(credit);
+        emit LogConsortiumCredited(credit);
     }
 
     function _debitConsortium(uint256 debit) internal {
         consortium.balance = consortium.balance.sub(debit);
-        emit ConsortiumDebited(debit);
+        emit LogConsortiumDebited(debit);
     }
 
     function _creditEscrow(uint256 credit) internal {
         consortium.escrow = consortium.escrow.add(credit);
+        emit LogEscrowCredited(credit);
     }
 
     function _debitEscrow(uint256 debit) internal {
         consortium.escrow = consortium.escrow.sub(debit);
+        emit LogEscrowDebited(debit);
     }
 
     /**
