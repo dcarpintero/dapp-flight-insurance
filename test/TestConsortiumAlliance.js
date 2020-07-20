@@ -12,7 +12,7 @@ contract("ConsortiumAlliance", async (accounts) => {
   before("setup contract", async () => {
     config = await Test.Config(accounts);
     admin = accounts[0];
-    firstAffiliate = accounts[1];
+    firstAffiliate = accounts[2];
     /*
     await config.consortiumAlliance.authorizeCaller(
       config.flightInsuranceHandler.address
@@ -48,6 +48,8 @@ contract("ConsortiumAlliance", async (accounts) => {
 
     it(`lets pay membership and approve a first affiliate to join consortium`, async function () {
       // given
+      const contractBalanceBefore = await web3.eth.getBalance(config.address);
+      const consortiumBalanceBefore = await config.consortiumAlliance.getConsortiumBalance.call();
       let fee = web3.utils.toWei("10", "ether");
 
       // when
@@ -56,10 +58,23 @@ contract("ConsortiumAlliance", async (accounts) => {
         value: fee,
       });
 
+      const contractBalanceAfter = await web3.eth.getBalance(config.address);
+      const consortiumBalanceAfter = await config.consortiumAlliance.getConsortiumBalance.call();
+
       // then
       truffleAssert.eventEmitted(tx, "LogAffiliateFunded", (ev) => {
         return ev;
       });
+
+      assert.equal(
+        Number(contractBalanceAfter),
+        Number(contractBalanceBefore) + Number(fee)
+      );
+
+      assert.equal(
+        Number(consortiumBalanceAfter),
+        Number(consortiumBalanceBefore) + Number(fee)
+      );
     });
 
     it(`lets consortium suspendService()`, async function () {
@@ -84,6 +99,8 @@ contract("ConsortiumAlliance", async (accounts) => {
 
     it(`lets consortium member further fund the guarantee insurance deposit`, async function () {
       // given
+      const contractBalanceBefore = await web3.eth.getBalance(config.address);
+      const consortiumBalanceBefore = await config.consortiumAlliance.getConsortiumBalance.call();
       let credit = web3.utils.toWei("5", "ether");
 
       // when
@@ -92,10 +109,23 @@ contract("ConsortiumAlliance", async (accounts) => {
         value: credit,
       });
 
+      const contractBalanceAfter = await web3.eth.getBalance(config.address);
+      const consortiumBalanceAfter = await config.consortiumAlliance.getConsortiumBalance.call();
+
       // then
       truffleAssert.eventEmitted(tx, "LogConsortiumCredited", (ev) => {
         return ev;
       });
+
+      assert.equal(
+        Number(contractBalanceAfter),
+        Number(contractBalanceBefore) + Number(credit)
+      );
+
+      assert.equal(
+        Number(consortiumBalanceAfter),
+        Number(consortiumBalanceBefore) + Number(credit)
+      );
     });
   });
 
