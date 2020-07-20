@@ -390,6 +390,7 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
      */
     function creditInsurance(bytes32 _key) public onlyAdmin onlyOperational {
         require(insuranceDeposit[_key] != 0, "Invalid insurance key");
+
         uint256 credit = insuranceDeposit[_key];
 
         _debitEscrow(credit);
@@ -400,15 +401,17 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
      * @dev Credits Admin with the registered insurance premium, only if the
      *      contract balance equals the consortium and escrow balance (StopLoss).
      */
-    function withdrawInsurance(bytes32 key)
+    function withdrawInsurance(bytes32 _key)
         public
         stopLoss
         onlyAdmin
         onlyOperational
     {
-        uint256 deposit = insuranceDeposit[key];
-        uint256 premium = deposit.mul(INSURANCE_PREMIUM_FACTOR.div(100));
-        // should always be true
+        require(insuranceDeposit[_key] != 0, "Invalid insurance key");
+
+        uint256 deposit = insuranceDeposit[_key];
+        uint256 premium = deposit.mul(INSURANCE_PREMIUM_FACTOR).div(100);
+
         require(consortium.balance.add(consortium.escrow) >= premium);
 
         _debitEscrow(deposit);

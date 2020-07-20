@@ -12,7 +12,7 @@ contract("ConsortiumAlliance", async (accounts) => {
   before("setup contract", async () => {
     config = await Test.Config(accounts);
     admin = accounts[0];
-    firstAffiliate = accounts[6];
+    firstAffiliate = accounts[1];
     /*
     await config.consortiumAlliance.authorizeCaller(
       config.flightInsuranceHandler.address
@@ -208,87 +208,11 @@ contract("ConsortiumAlliance", async (accounts) => {
         Number(consortiumBalanceAfter) + Number(consortiumEscrowAfter)
       );
     });
-    /*
-    it(`lets Admin register insurance deposit`, async function () {
-      // given
-      // const consortiumBalanceBefore = await web3.eth.getBalance(config.address);
-      const consortiumBalanceBefore = await web3.eth.getBalance(config.address);
-      console.log("config.address:" + config.address);
-      console.log("consortiumBalanceBefore:" + consortiumBalanceBefore);
-      const deposit = web3.utils.toWei("1", "ether");
-      console.log("deposit:" + deposit);
-
-      // when
-      let key = await config.consortiumAlliance.depositInsurance.call({
-        from: admin,
-        value: deposit,
-      });
-      console.log("key:" + key);
-
-      let tx = await config.consortiumAlliance.depositInsurance({
-        from: admin,
-        value: deposit,
-      });
-
-      // then
-      truffleAssert.eventEmitted(tx, "LogInsuranceDepositRegistered", (ev) => {
-        return ev;
-      });
-
-      // -----------------------------------------------------------------------
-      console.log("hexToBytes:" + web3.utils.hexToBytes(key));
-      tx2 = await config.consortiumAlliance.creditInsurance(
-        web3.utils.hexToBytes(key),
-        {
-          from: admin,
-        }
-      );
-
-      // then
-      const consortiumBalanceAfter = await web3.eth.getBalance(config.address);
-      console.log("consortiumBalanceAfter:" + consortiumBalanceAfter);
-
-      assert.equal(
-        Number(consortiumBalanceAfter) - Number(consortiumBalanceBefore),
-        deposit
-      );
-    });*/
-
-    /*
-    it(`lets Admin deposit and credit insurance to consortium`, async function () {
-      // given
-      const consortiumBalanceBefore = await web3.eth.getBalance(config.address);
-      const deposit = web3.utils.toWei("1", "ether");
-
-      // when
-      let key = await config.consortiumAlliance.depositInsurance.call({
-        from: admin,
-        value: deposit,
-      });
-      console.log("key:" + key);
-
-      tx = await config.consortiumAlliance.creditInsurance(
-        web3.utils.hexToBytes(key),
-        {
-          from: admin,
-        }
-      );
-
-      // then
-      truffleAssert.eventEmitted(tx, "LogConsortiumCredited", (ev) => {
-        return ev;
-      });
-
-      const consortiumBalanceAfter = await web3.eth.getBalance(config.address);
-      assert.equal(
-        Number(consortiumBalanceAfter) - Number(consortiumBalanceBefore),
-        deposit
-      );
-    });
 
     it(`lets Admin deposit and withdraw insurance premium for further distribution to insuree`, async function () {
       // given
-      let deposit = web3.utils.toWei("1", "ether");
+      const deposit = web3.utils.toWei("1", "ether");
+      const premium_factor = 50;
 
       // when
       let key = await config.consortiumAlliance.depositInsurance.call({
@@ -296,15 +220,56 @@ contract("ConsortiumAlliance", async (accounts) => {
         value: deposit,
       });
 
-      tx = await config.consortiumAlliance.withdrawInsurance(key, {
+      const consortiumBalanceBefore = await config.consortiumAlliance.getConsortiumBalance.call();
+
+      let deposit_tx = await config.consortiumAlliance.depositInsurance({
         from: admin,
+        value: deposit,
+      });
+
+      const consortiumEscrowBefore = await config.consortiumAlliance.getConsortiumEscrow.call();
+
+      let debit_tx = await config.consortiumAlliance.withdrawInsurance(
+        web3.utils.hexToBytes(key),
+        {
+          from: admin,
+        }
+      );
+
+      const consortiumEscrowAfter = await config.consortiumAlliance.getConsortiumEscrow.call();
+      const consortiumBalanceAfter = await config.consortiumAlliance.getConsortiumBalance.call();
+
+      // then
+      // events
+      truffleAssert.eventEmitted(debit_tx, "LogConsortiumDebited", (ev) => {
+        return ev;
+      });
+
+      truffleAssert.eventEmitted(debit_tx, "LogEscrowDebited", (ev) => {
+        return ev;
       });
 
       // then
-      truffleAssert.eventEmitted(tx, "LogConsortiumDebited", (ev) => {
-        return ev;
-      });
-    });*/
+      // balances
+      const contractBalance = await web3.eth.getBalance(config.address);
+
+      // debit deposit from escrow
+      assert.equal(
+        Number(consortiumEscrowBefore) - Number(consortiumEscrowAfter),
+        deposit
+      );
+
+      // debit premium from consortium
+      assert.equal(
+        Number(consortiumBalanceBefore) - Number(consortiumBalanceAfter),
+        deposit * (premium_factor / 100)
+      );
+
+      assert.equal(
+        Number(contractBalance),
+        Number(consortiumBalanceAfter) + Number(consortiumEscrowAfter)
+      );
+    });
   });
 
   describe("Roles & Permissions", function () {
