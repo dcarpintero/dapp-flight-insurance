@@ -9,6 +9,9 @@ src/server/config.json
 /dapp/
 prod/
 
+#VS
+.vscode
+
 # Runtime data
 pids
 *.pid
