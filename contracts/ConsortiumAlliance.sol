@@ -314,7 +314,7 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
             return true;
         }
 
-        return (approvalVotes.div(consortium.members).mul(100) >=
+        return (approvalVotes.mul(100).div(consortium.members) >=
             CONSORTIUM_CONSENSUS);
     }
 
