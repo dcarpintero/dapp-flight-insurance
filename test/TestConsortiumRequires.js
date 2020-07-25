@@ -23,7 +23,7 @@ contract("ConsortiumAlliance", function (accounts) {
     nonAdmin = accounts[8];
     nonAffiliate = accounts[9];
 
-    let instance = await ConsortiumAlliance.deployed();
+    instance = await ConsortiumAlliance.deployed();
 
     await instance.createAffiliate(firstAffiliate, "firstAffiliate");
     await instance.createAffiliate(secondAffiliate, "secondAffiliate");
@@ -40,8 +40,6 @@ contract("ConsortiumAlliance", function (accounts) {
   describe("Roles & Permissions", function () {
     describe("Admin Rights", function () {
       it(`lets revert create affiliate if non-admin`, async () => {
-        let instance = await ConsortiumAlliance.deployed();
-
         await truffleAssert.reverts(
           instance.createAffiliate(firstAffiliate, "affiliate", {
             from: nonAdmin,
@@ -52,8 +50,6 @@ contract("ConsortiumAlliance", function (accounts) {
       });
 
       it(`lets revert deposit insurance if non-admin`, async () => {
-        let instance = await ConsortiumAlliance.deployed();
-
         await truffleAssert.reverts(
           instance.depositInsurance({
             from: nonAdmin,
@@ -65,8 +61,6 @@ contract("ConsortiumAlliance", function (accounts) {
       });
 
       it(`lets revert credit insurance if non-admin`, async () => {
-        let instance = await ConsortiumAlliance.deployed();
-
         await truffleAssert.reverts(
           instance.creditInsurance(INSURANCE_KEY, {
             from: nonAdmin,
@@ -77,8 +71,6 @@ contract("ConsortiumAlliance", function (accounts) {
       });
 
       it(`lets revert withdraw insurance if non-admin`, async () => {
-        let instance = await ConsortiumAlliance.deployed();
-
         await truffleAssert.reverts(
           instance.withdrawInsurance(INSURANCE_KEY, {
             from: nonAdmin,
@@ -117,14 +109,11 @@ contract("ConsortiumAlliance", function (accounts) {
 
     describe("Operational Status", function () {
       it(`lets suspend service`, async function () {
-        let instance = await ConsortiumAlliance.deployed();
-
         await instance.suspendService({ from: firstAffiliate });
         assert.isFalse(await instance.isOperational());
       });
 
       it(`lets be not Operational - Create Affiliate`, async function () {
-        let instance = await ConsortiumAlliance.deployed();
         assert.isFalse(await instance.isOperational());
 
         await truffleAssert.reverts(
@@ -137,7 +126,6 @@ contract("ConsortiumAlliance", function (accounts) {
       });
 
       it(`lets be not Operational - Approve Affiliate`, async function () {
-        let instance = await ConsortiumAlliance.deployed();
         assert.isFalse(await instance.isOperational());
 
         await truffleAssert.reverts(
@@ -150,7 +138,6 @@ contract("ConsortiumAlliance", function (accounts) {
       });
 
       it(`lets be not Operational - Membership Fee`, async function () {
-        let instance = await ConsortiumAlliance.deployed();
         assert.isFalse(await instance.isOperational());
 
         await truffleAssert.reverts(
@@ -164,7 +151,6 @@ contract("ConsortiumAlliance", function (accounts) {
       });
 
       it(`lets be not Operational - Funding`, async function () {
-        let instance = await ConsortiumAlliance.deployed();
         assert.isFalse(await instance.isOperational());
 
         await truffleAssert.reverts(
@@ -178,7 +164,6 @@ contract("ConsortiumAlliance", function (accounts) {
       });
 
       it(`lets be not Operational - Deposit Insurance`, async function () {
-        let instance = await ConsortiumAlliance.deployed();
         assert.isFalse(await instance.isOperational());
 
         await truffleAssert.reverts(
@@ -192,7 +177,6 @@ contract("ConsortiumAlliance", function (accounts) {
       });
 
       it(`lets be not Operational - Credit Insurance`, async function () {
-        let instance = await ConsortiumAlliance.deployed();
         assert.isFalse(await instance.isOperational());
 
         await truffleAssert.reverts(
@@ -205,7 +189,6 @@ contract("ConsortiumAlliance", function (accounts) {
       });
 
       it(`lets be not Operational - Withdraw Insurance`, async function () {
-        let instance = await ConsortiumAlliance.deployed();
         assert.isFalse(await instance.isOperational());
 
         await truffleAssert.reverts(
@@ -218,7 +201,6 @@ contract("ConsortiumAlliance", function (accounts) {
       });
 
       it(`lets resume service`, async function () {
-        let instance = await ConsortiumAlliance.deployed();
         assert.isFalse(await instance.isOperational());
 
         await instance.resumeService({
