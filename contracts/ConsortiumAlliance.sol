@@ -267,7 +267,6 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
         });
 
         _updateMembershipStatus(_affiliate);
-        _setOperationalConsensus(_affiliate, true);
 
         emit LogAffiliateRegistered(_affiliate, _title);
     }
@@ -302,8 +301,6 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
             affiliates[_affiliate].status = MembershipStatus.APPROVED;
             affiliates[_affiliate].updatedTimestamp = block.timestamp;
 
-            consortium.members = consortium.members.add(1);
-
             emit LogAffiliateApproved(_affiliate, affiliates[_affiliate].title);
         }
     }
@@ -314,11 +311,12 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
         returns (bool)
     {
         uint256 approvalVotes = affiliates[_affiliate].approvals;
+        if (consortium.members <= 4) {
+            return true;
+        }
 
-        return
-            (consortium.members <= 4) ||
-            (approvalVotes.div(consortium.members).mul(100) >=
-                CONSORTIUM_CONSENSUS);
+        return (approvalVotes.div(consortium.members).mul(100) >=
+            CONSORTIUM_CONSENSUS);
     }
 
     // ----------------- INSURANCE CAPITAL AND PREMIUMS -----------------
@@ -332,7 +330,10 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
         _creditAffiliate(msg.sender, msg.value);
         _creditConsortium(msg.value);
         affiliates[msg.sender].status = MembershipStatus.SEED_FUNDED;
+
         _setupRole(CONSORTIUM_ROLE, msg.sender);
+        consortium.members = consortium.members.add(1);
+        _setOperationalConsensus(msg.sender, true);
 
         emit LogAffiliateFunded(
             msg.sender,
