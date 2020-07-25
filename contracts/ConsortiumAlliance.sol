@@ -45,6 +45,9 @@ import "@openzeppelin/contracts/payment/PullPayment.sol";
  *      - Admin (contract owner) handles insurance capital and premiums
  *        for distribution to insurees according to the business rules.
  *
+ * Security:
+ *      - Stop Loss.
+ *      - Reentrancy checks in credit and withdraw insurance functions.
  */
 contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
     using SafeMath for uint256;
@@ -57,6 +60,8 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
 
     uint256 public constant INSURANCE_MAX_FEE = 1 ether;
     uint256 public constant INSURANCE_PREMIUM_FACTOR = 150;
+
+    uint8 private nonce = 0;
 
     // ----------------- CONSORTIUM -----------------
     struct OperationalConsensus {
@@ -90,7 +95,7 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
     // ----------------- INSURANCE CAPITAL -----------------
     mapping(bytes32 => uint256) private insuranceDeposit;
 
-    // ----------------- EVENTS ----------------- //
+    // ----------------- EVENTS -----------------
     event LogAffiliateRegistered(address indexed affiliate, string title);
     event LogAffiliateApproved(address indexed affiliate, string title);
     event LogAffiliateFunded(
@@ -110,13 +115,15 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
     event LogInsuranceDepositCredited(bytes32 key, uint256 credit);
     event LogInsuranceDepositWithdrawn(bytes32 key, uint256 debit);
 
+    event LogKeyBurnt(bytes32 key);
+
     // ----------------- MODIFIERS -----------------
 
     /**
      * @dev StopLoss if the contract balance is unexpected.
      *
      * WARNING: not a strict equality of the balance because the contract can be
-     * forcibly sent ether without going through the deposit() function!
+     * forcibly sent ether without going through the deposit() function:
      *
      * https://consensys.github.io/smart-contract-best-practices/recommendations
      */
@@ -179,6 +186,11 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
         _;
     }
 
+    modifier onlyValidKey(bytes32 _key) {
+        require(insuranceDeposit[_key] != 0, "Invalid insurance key");
+        _;
+    }
+
     /**
      * @dev Constructor
      */
@@ -189,6 +201,9 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
 
     // ----------------- OPERATIONAL CONSENSUS -----------------
 
+    /**
+     * @dev Returns True if the contract functions are operational
+     */
     function isOperational() public view returns (bool) {
         return consortium.operational.status;
     }
@@ -246,7 +261,7 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
         consortium.operational.votes[voter] = vote;
     }
 
-    // ----------------- AFFILIATES -----------------
+    // ----------------- AFFILIATE WORKFLOW -----------------
 
     /**
      * @dev Let Admin add an Affiliate to the registration queue
@@ -359,14 +374,6 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
         return consortium.escrow;
     }
 
-    /**
-     * @dev Lets Admin register insurance deposit in a escrow fund, only if the
-     *      consortium balance would be enough to pay the premium.
-     */
-    function depositInsurance2() public pure returns (bytes32) {
-        return keccak256(abi.encodePacked("test"));
-    }
-
     function depositInsurance()
         public
         payable
@@ -376,7 +383,9 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
         onlyOperational
         returns (bytes32)
     {
-        bytes32 key = keccak256(abi.encodePacked(msg.sender, block.timestamp));
+        bytes32 key = keccak256(
+            abi.encodePacked(msg.sender, block.timestamp, _getNonce())
+        );
         insuranceDeposit[key] = msg.value;
 
         _creditEscrow(msg.value);
@@ -385,39 +394,58 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
         return key;
     }
 
+    function _getNonce() internal returns (uint8) {
+        if (nonce > 250) {
+            nonce = 0;
+        }
+        return nonce++;
+    }
+
     /**
      * @dev Lets Admin credit consortium a non-reedemable insurance deposit.
      */
-    function creditInsurance(bytes32 _key) public onlyAdmin onlyOperational {
-        require(insuranceDeposit[_key] != 0, "Invalid insurance key");
-
+    function creditInsurance(bytes32 _key)
+        public
+        onlyAdmin
+        onlyValidKey(_key)
+        onlyOperational
+    {
         uint256 credit = insuranceDeposit[_key];
 
+        _burnKey(_key);
         _debitEscrow(credit);
         _creditConsortium(credit);
     }
 
     /**
-     * @dev Credits Admin with the registered insurance premium, only if the
-     *      contract balance equals the consortium and escrow balance (StopLoss).
+     * @dev Credits Admin with the registered insurance premium, only if
+     *      contract balance >= consortium + escrow balance (StopLoss).
      */
     function withdrawInsurance(bytes32 _key)
         public
         stopLoss
         onlyAdmin
+        onlyValidKey(_key)
         onlyOperational
     {
-        require(insuranceDeposit[_key] != 0, "Invalid insurance key");
-
         uint256 deposit = insuranceDeposit[_key];
         uint256 premium = deposit.mul(INSURANCE_PREMIUM_FACTOR).div(100);
 
         require(consortium.balance.add(consortium.escrow) >= premium);
 
+        _burnKey(_key);
         _debitEscrow(deposit);
         _debitConsortium(premium.sub(deposit));
 
         _asyncTransfer(msg.sender, premium);
+    }
+
+    /**
+     * @dev Invalidates key to prevent reentrancy in credit and withdraw insurance
+     */
+    function _burnKey(bytes32 _key) internal onlyValidKey(_key) {
+        insuranceDeposit[_key] = 0;
+        emit LogKeyBurnt(_key);
     }
 
     function _creditAffiliate(address _key, uint256 credit) internal {
