@@ -266,9 +266,8 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
             title: _title
         });
 
-        _updateMembershipStatus(_affiliate);
-
         emit LogAffiliateRegistered(_affiliate, _title);
+        _updateMembershipStatus(_affiliate);
     }
 
     /**
@@ -311,7 +310,7 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
         returns (bool)
     {
         uint256 approvalVotes = affiliates[_affiliate].approvals;
-        if (consortium.members <= 4) {
+        if (consortium.members < 4) {
             return true;
         }
 
