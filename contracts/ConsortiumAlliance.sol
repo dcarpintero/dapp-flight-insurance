@@ -141,7 +141,7 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
     modifier onlyApprovedAffiliate() {
         require(
             affiliates[msg.sender].status == MembershipStatus.APPROVED,
-            "Caller is not an approved affiliate"
+            "Caller is not in approved status"
         );
         _;
     }
@@ -230,14 +230,14 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
         }
 
         if (
-            consortium.operational.totalON.div(consortium.members).mul(100) >=
+            consortium.operational.totalON.mul(100).div(consortium.members) >=
             CONSORTIUM_CONSENSUS
         ) {
             consortium.operational.status = true;
         }
 
         if (
-            consortium.operational.totalOFF.div(consortium.members).mul(100) >
+            consortium.operational.totalOFF.mul(100).div(consortium.members) >
             CONSORTIUM_CONSENSUS
         ) {
             consortium.operational.status = false;
