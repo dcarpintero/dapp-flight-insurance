@@ -18,7 +18,7 @@ import "@openzeppelin/contracts/payment/PullPayment.sol";
  *      - Approved affiliates shall satisfy a consortium fee to become fully
  *        members of the consortium and adquire voting rights.
  *
- *      - Voting rights apply to membership requests and operational status.
+ *      - Voting rights apply to membership approvals and operational status.
  *
  *      - Operational status allows the contract to be stop and resumed.
  *

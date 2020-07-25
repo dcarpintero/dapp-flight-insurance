@@ -3,6 +3,10 @@ const assert = require("chai").assert;
 const truffleAssert = require("truffle-assertions");
 
 contract("ConsortiumAlliance", async (accounts) => {
+  const MEMBERSHIP_FEE = web3.utils.toWei("10", "ether");
+  const INSURANCE_FEE = web3.utils.toWei("1", "ether");
+  const FUNDING_VALUE = web3.utils.toWei("5", "ether");
+
   before("setup contract", async () => {
     admin = accounts[0];
     firstAffiliate = accounts[1];
@@ -35,7 +39,7 @@ contract("ConsortiumAlliance", async (accounts) => {
       // given
       const contractBalanceBefore = await web3.eth.getBalance(instance.address);
       const consortiumBalanceBefore = await instance.getConsortiumBalance.call();
-      let fee = web3.utils.toWei("10", "ether");
+      let fee = MEMBERSHIP_FEE;
 
       // when
       let tx = await instance.depositMebership({
@@ -86,7 +90,7 @@ contract("ConsortiumAlliance", async (accounts) => {
       // given
       const contractBalanceBefore = await web3.eth.getBalance(instance.address);
       const consortiumBalanceBefore = await instance.getConsortiumBalance.call();
-      let credit = web3.utils.toWei("5", "ether");
+      let credit = FUNDING_VALUE;
 
       // when
       let tx = await instance.fundConsortium({
@@ -120,7 +124,7 @@ contract("ConsortiumAlliance", async (accounts) => {
       const consortiumBalanceBefore = await instance.getConsortiumBalance.call();
       const consortiumEscrowBefore = await instance.getConsortiumEscrow.call();
 
-      const deposit = web3.utils.toWei("1", "ether");
+      const deposit = INSURANCE_FEE;
 
       // when
       let deposit_tx = await instance.depositInsurance({
@@ -167,7 +171,7 @@ contract("ConsortiumAlliance", async (accounts) => {
 
     it(`lets Admin deposit and credit insurance to consortium`, async () => {
       // given
-      const deposit = web3.utils.toWei("1", "ether");
+      const deposit = INSURANCE_FEE;
 
       // when
       let key = await instance.depositInsurance.call({
@@ -226,7 +230,7 @@ contract("ConsortiumAlliance", async (accounts) => {
 
     it(`lets Admin deposit and withdraw insurance premium for further distribution to insuree`, async () => {
       // given
-      const deposit = web3.utils.toWei("1", "ether");
+      const deposit = INSURANCE_FEE;
       const premium_factor = 50;
 
       // when

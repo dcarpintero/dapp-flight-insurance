@@ -10,7 +10,7 @@ contract("ConsortiumAlliance", function (accounts) {
 
   const MEMBERSHIP_FEE = web3.utils.toWei("10", "ether");
   const INSURANCE_FEE = web3.utils.toWei("1", "ether");
-  const FUNDING_VALUE = web3.utils.toWei("15", "ether");
+  const FUNDING_VALUE = web3.utils.toWei("5", "ether");
   const INSURANCE_KEY = web3.utils.fromAscii("key");
 
   before("setup contract", async () => {
