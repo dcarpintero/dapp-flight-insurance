@@ -185,6 +185,7 @@ contract("ConsortiumAlliance", async (accounts) => {
         from: admin,
         value: deposit,
       });
+      truffleAssert.eventEmitted(deposit_tx, "LogInsuranceDepositRegistered");
 
       const consortiumEscrowBefore = await instance.getConsortiumEscrow.call();
 
@@ -200,13 +201,8 @@ contract("ConsortiumAlliance", async (accounts) => {
 
       // then
       // events
-      truffleAssert.eventEmitted(credit_tx, "LogConsortiumCredited", (ev) => {
-        return ev;
-      });
-
-      truffleAssert.eventEmitted(credit_tx, "LogEscrowDebited", (ev) => {
-        return ev;
-      });
+      truffleAssert.eventEmitted(credit_tx, "LogConsortiumCredited");
+      truffleAssert.eventEmitted(credit_tx, "LogEscrowDebited");
 
       // then
       // balances
@@ -245,6 +241,7 @@ contract("ConsortiumAlliance", async (accounts) => {
         from: admin,
         value: deposit,
       });
+      truffleAssert.eventEmitted(deposit_tx, "LogInsuranceDepositRegistered");
 
       const consortiumEscrowBefore = await instance.getConsortiumEscrow.call();
 
@@ -260,13 +257,8 @@ contract("ConsortiumAlliance", async (accounts) => {
 
       // then
       // events
-      truffleAssert.eventEmitted(debit_tx, "LogConsortiumDebited", (ev) => {
-        return ev;
-      });
-
-      truffleAssert.eventEmitted(debit_tx, "LogEscrowDebited", (ev) => {
-        return ev;
-      });
+      truffleAssert.eventEmitted(debit_tx, "LogConsortiumDebited");
+      truffleAssert.eventEmitted(debit_tx, "LogEscrowDebited");
 
       // then
       // balances
