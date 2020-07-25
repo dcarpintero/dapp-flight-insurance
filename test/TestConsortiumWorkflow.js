@@ -3,35 +3,25 @@ const assert = require("chai").assert;
 const truffleAssert = require("truffle-assertions");
 
 contract("ConsortiumAlliance", async (accounts) => {
-
   before("setup contract", async () => {
     admin = accounts[0];
     firstAffiliate = accounts[1];
     secondAffiliate = accounts[2];
-    nonAffiliate = accounts [9];
+    nonAffiliate = accounts[9];
+
     instance = await ConsortiumAlliance.deployed();
   });
 
-  console.log("ganache-cli accounts:");
-  console.log("Contract Owner: accounts[0] ", accounts[0]);
-  console.log("First Affiliate: accounts[1] ", accounts[1]);
-  console.log("Second Affiliate: accounts[2] ", accounts[2]);
-  console.log("Third Affiliate: accounts[3] ", accounts[3]);
-  console.log("Fourth Affiliate: accounts[4] ", accounts[4]);
-  console.log("Fifth Affiliate: accounts[5] ", accounts[5]);
-
-  describe("First Affiliate Workflow", function () {
-    it(`lets be operational after deployment`, async function () {
-      
-
+  describe("Affiliate Workflow", function () {
+    it(`lets be operational after deployment`, async () => {
       assert.isTrue(await instance.isOperational());
     });
 
-    it(`lets register a first affiliate`, async function () {
+    it(`lets register a first affiliate`, async () => {
       // when
       let tx = await instance.createAffiliate(
         firstAffiliate,
-        "First Affiliate"
+        "First firstAffiliate"
       );
 
       // then
@@ -41,7 +31,7 @@ contract("ConsortiumAlliance", async (accounts) => {
       assert.isTrue(await instance.isOperational());
     });
 
-    it(`lets pay membership and approve a first affiliate to join consortium`, async function () {
+    it(`lets pay membership and approve a first affiliate to join consortium`, async () => {
       // given
       const contractBalanceBefore = await web3.eth.getBalance(instance.address);
       const consortiumBalanceBefore = await instance.getConsortiumBalance.call();
@@ -72,7 +62,7 @@ contract("ConsortiumAlliance", async (accounts) => {
       );
     });
 
-    it(`lets consortium suspendService()`, async function () {
+    it(`lets consortium suspendService()`, async () => {
       // when
       await instance.suspendService({
         from: firstAffiliate,
@@ -82,7 +72,7 @@ contract("ConsortiumAlliance", async (accounts) => {
       assert.isFalse(await instance.isOperational());
     });
 
-    it(`lets consortium startService()`, async function () {
+    it(`lets consortium startService()`, async () => {
       // when
       await instance.resumeService({
         from: firstAffiliate,
@@ -92,7 +82,7 @@ contract("ConsortiumAlliance", async (accounts) => {
       assert.isTrue(await instance.isOperational());
     });
 
-    it(`lets consortium member further fund the guarantee insurance deposit`, async function () {
+    it(`lets consortium member fund the guarantee insurance deposit`, async () => {
       // given
       const contractBalanceBefore = await web3.eth.getBalance(instance.address);
       const consortiumBalanceBefore = await instance.getConsortiumBalance.call();
@@ -125,7 +115,7 @@ contract("ConsortiumAlliance", async (accounts) => {
   });
 
   describe("Insurance Workflow", function () {
-    it(`lets Admin register insurance deposit`, async function () {
+    it(`lets Admin register insurance deposit`, async () => {
       // given
       const consortiumBalanceBefore = await instance.getConsortiumBalance.call();
       const consortiumEscrowBefore = await instance.getConsortiumEscrow.call();
@@ -175,7 +165,7 @@ contract("ConsortiumAlliance", async (accounts) => {
       );
     });
 
-    it(`lets Admin deposit and credit insurance to consortium`, async function () {
+    it(`lets Admin deposit and credit insurance to consortium`, async () => {
       // given
       const deposit = web3.utils.toWei("1", "ether");
 
@@ -234,7 +224,7 @@ contract("ConsortiumAlliance", async (accounts) => {
       );
     });
 
-    it(`lets Admin deposit and withdraw insurance premium for further distribution to insuree`, async function () {
+    it(`lets Admin deposit and withdraw insurance premium for further distribution to insuree`, async () => {
       // given
       const deposit = web3.utils.toWei("1", "ether");
       const premium_factor = 50;
@@ -296,5 +286,4 @@ contract("ConsortiumAlliance", async (accounts) => {
       );
     });
   });
-
 });
