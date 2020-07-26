@@ -7,6 +7,8 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/payment/PullPayment.sol";
 
+import "./ConsortiumSettings.sol";
+
 /**
  * @title ConsortiumInsurance
  * @dev Provides a generic Consortium data model and fine CRUD operations for
@@ -48,19 +50,16 @@ import "@openzeppelin/contracts/payment/PullPayment.sol";
  * Security:
  *      - Stop Loss.
  *      - Reentrancy checks in credit and withdraw insurance functions.
+ *      - PullPayment: the paying contract doesn’t interact directly with the receiver
+ *        account, which must withdraw its payments itself. Payees can query their due
+ *        payments with payments, and retrieve them with withdrawPayments.
+ *        https://docs.openzeppelin.com/contracts/3.x/api/payment#PullPayment
+ *        https://consensys.github.io/smart-contract-best-practices/recommendations/#favor-pull-over-push-for-external-calls
  */
 contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
     using SafeMath for uint256;
 
-    bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
-    bytes32 public constant CONSORTIUM_ROLE = keccak256("CONSORTIUM_ROLE");
-
-    uint256 public constant CONSORTIUM_MEMBERSHIP_FEE = 10 ether;
-    uint256 public constant CONSORTIUM_CONSENSUS = 50;
-
-    uint256 public constant INSURANCE_MAX_FEE = 1 ether;
-    uint256 public constant INSURANCE_PREMIUM_FACTOR = 150;
-
+    ConsortiumSettings public settings;
     uint8 private nonce = 0;
 
     // ----------------- CONSORTIUM -----------------
@@ -141,7 +140,10 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
     }
 
     modifier onlyAdmin() {
-        require(hasRole(ADMIN_ROLE, msg.sender), "Caller is not Admin");
+        require(
+            hasRole(settings.ADMIN_ROLE(), msg.sender),
+            "Caller is not Admin"
+        );
         _;
     }
 
@@ -155,7 +157,7 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
 
     modifier onlyConsortiumAffiliate() {
         require(
-            hasRole(CONSORTIUM_ROLE, msg.sender),
+            hasRole(settings.CONSORTIUM_ROLE(), msg.sender),
             "Caller is not a consortium Affiliate"
         );
         _;
@@ -163,7 +165,7 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
 
     modifier onlyConsortiumFee() {
         require(
-            msg.value == CONSORTIUM_MEMBERSHIP_FEE,
+            msg.value == settings.CONSORTIUM_MEMBERSHIP_FEE(),
             "Unexpected consortium fee"
         );
         _;
@@ -171,7 +173,7 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
 
     modifier onlyMaxInsurance() {
         require(
-            (msg.value > 0) && (msg.value <= INSURANCE_MAX_FEE),
+            (msg.value > 0) && (msg.value <= settings.INSURANCE_MAX_FEE()),
             "Unexpected insurance deposit"
         );
         _;
@@ -180,7 +182,9 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
     modifier onlyMaxGuarantee() {
         require(
             address(this).balance >=
-                consortium.escrow.mul(INSURANCE_PREMIUM_FACTOR.div(100)),
+                consortium.escrow.mul(settings.INSURANCE_PREMIUM_FACTOR()).div(
+                    100
+                ),
             "Contract balance does not guarantee insurance premium"
         );
         _;
@@ -194,8 +198,9 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
     /**
      * @dev Constructor
      */
-    constructor() public {
-        _setupRole(ADMIN_ROLE, msg.sender);
+    constructor(address _settings) public {
+        settings = ConsortiumSettings(_settings);
+        _setupRole(settings.ADMIN_ROLE(), msg.sender);
         consortium.operational.status = true;
     }
 
@@ -212,26 +217,23 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
      * @dev Vote to pause contract operations
      */
     function suspendService() public onlyConsortiumAffiliate {
-        _setOperationalConsensus(msg.sender, false);
+        _registerVoteOperational(msg.sender, false);
     }
 
     /**
      * @dev Vote to resume contract operations
      */
     function resumeService() public onlyConsortiumAffiliate {
-        _setOperationalConsensus(msg.sender, true);
+        _registerVoteOperational(msg.sender, true);
     }
 
-    function _setTotalON(uint256 _value) internal {
-        consortium.operational.totalON = _value;
-    }
+    function _registerVoteOperational(address voter, bool vote) private {
+        require(
+            consortium.operational.votes[voter] != vote,
+            "This vote has already been registered."
+        );
 
-    function _setTotalOFF(uint256 _value) internal {
-        consortium.operational.totalOFF = _value;
-    }
-
-    function _setOperationalConsensus(address voter, bool vote) private {
-        require(consortium.operational.votes[voter] != vote);
+        consortium.operational.votes[voter] = vote;
 
         if (vote == true) {
             _setTotalON(consortium.operational.totalON.add(1));
@@ -244,21 +246,31 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
                 _setTotalON(consortium.operational.totalON.sub(1));
         }
 
+        _updateOperationalStatus();
+    }
+
+    function _updateOperationalStatus() private {
         if (
             consortium.operational.totalON.mul(100).div(consortium.members) >=
-            CONSORTIUM_CONSENSUS
+            settings.CONSORTIUM_CONSENSUS()
         ) {
             consortium.operational.status = true;
         }
 
         if (
             consortium.operational.totalOFF.mul(100).div(consortium.members) >
-            CONSORTIUM_CONSENSUS
+            settings.CONSORTIUM_CONSENSUS()
         ) {
             consortium.operational.status = false;
         }
+    }
 
-        consortium.operational.votes[voter] = vote;
+    function _setTotalON(uint256 _value) internal {
+        consortium.operational.totalON = _value;
+    }
+
+    function _setTotalOFF(uint256 _value) internal {
+        consortium.operational.totalOFF = _value;
     }
 
     // ----------------- AFFILIATE WORKFLOW -----------------
@@ -330,7 +342,7 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
         }
 
         return (approvalVotes.mul(100).div(consortium.members) >=
-            CONSORTIUM_CONSENSUS);
+            settings.CONSORTIUM_CONSENSUS());
     }
 
     // ----------------- INSURANCE CAPITAL AND PREMIUMS -----------------
@@ -345,9 +357,9 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
         _creditConsortium(msg.value);
         affiliates[msg.sender].status = MembershipStatus.SEED_FUNDED;
 
-        _setupRole(CONSORTIUM_ROLE, msg.sender);
+        _setupRole(settings.CONSORTIUM_ROLE(), msg.sender);
         consortium.members = consortium.members.add(1);
-        _setOperationalConsensus(msg.sender, true);
+        _registerVoteOperational(msg.sender, true);
 
         emit LogAffiliateFunded(
             msg.sender,
@@ -429,7 +441,9 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
         onlyOperational
     {
         uint256 deposit = insuranceDeposit[_key];
-        uint256 premium = deposit.mul(INSURANCE_PREMIUM_FACTOR).div(100);
+        uint256 premium = deposit.mul(settings.INSURANCE_PREMIUM_FACTOR()).div(
+            100
+        );
 
         require(consortium.balance.add(consortium.escrow) >= premium);
 
