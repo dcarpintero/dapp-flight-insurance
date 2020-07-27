@@ -110,7 +110,11 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
     event LogEscrowCredited(uint256 credit);
     event LogEscrowDebited(uint256 debit);
 
-    event LogInsuranceDepositRegistered(bytes32 key, uint256 deposit);
+    event LogInsuranceDepositRegistered(
+        bytes32 key,
+        uint256 deposit,
+        uint8 nonce
+    );
     event LogInsuranceDepositCredited(bytes32 key, uint256 credit);
     event LogInsuranceDepositWithdrawn(bytes32 key, uint256 debit);
 
@@ -395,22 +399,32 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
         onlyOperational
         returns (bytes32)
     {
+        uint8 _nonce = _getPseudoRandom();
         bytes32 key = keccak256(
-            abi.encodePacked(msg.sender, block.timestamp, _getNonce())
+            abi.encodePacked(msg.sender, block.timestamp, _nonce)
         );
         insuranceDeposit[key] = msg.value;
 
         _creditEscrow(msg.value);
 
-        emit LogInsuranceDepositRegistered(key, insuranceDeposit[key]);
+        emit LogInsuranceDepositRegistered(key, insuranceDeposit[key], _nonce);
         return key;
     }
 
-    function _getNonce() internal returns (uint8) {
+    function _getPseudoRandom() internal returns (uint8) {
+        uint8 maxValue = 100;
+
+        uint8 random = uint8(
+            uint256(
+                keccak256(abi.encodePacked(blockhash(block.number - nonce++)))
+            ) % maxValue
+        );
+
         if (nonce > 250) {
-            nonce = 0;
+            nonce = 0; // Can only fetch blockhashes for last 256 blocks so we adapt
         }
-        return nonce++;
+
+        return random;
     }
 
     /**
@@ -454,10 +468,32 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
         _asyncTransfer(msg.sender, premium);
     }
 
+    /*
+    function withdrawInsurance(bytes32 _key, address _insuree)
+        public
+        stopLoss
+        onlyAdmin
+        onlyValidKey(_key)
+        onlyOperational
+    {
+        uint256 deposit = insuranceDeposit[_key];
+        uint256 premium = deposit.mul(settings.INSURANCE_PREMIUM_FACTOR()).div(
+            100
+        );
+
+        require(consortium.balance.add(consortium.escrow) >= premium);
+
+        _burnKey(_key);
+        _debitEscrow(deposit);
+        _debitConsortium(premium.sub(deposit));
+
+        _asyncTransfer(_insuree, premium);
+    }*/
+
     /**
      * @dev Invalidates key to prevent reentrancy in credit and withdraw insurance
      */
-    function _burnKey(bytes32 _key) internal onlyValidKey(_key) {
+    function _burnKey(bytes32 _key) internal {
         insuranceDeposit[_key] = 0;
         emit LogKeyBurnt(_key);
     }
