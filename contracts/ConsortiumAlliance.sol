@@ -50,9 +50,9 @@ import "./ConsortiumSettings.sol";
  * Security:
  *      - Stop Loss.
  *      - Reentrancy checks in credit and withdraw insurance functions.
- *      - PullPayment: the paying contract doesn’t interact directly with the receiver
+ *      - PullPayment: the paying contract does not interact directly with the receiver
  *        account, which must withdraw its payments itself. Payees can query their due
- *        payments with payments, and retrieve them with withdrawPayments.
+ *        payments with payments, and retrieve them with withdrawPayments functions.
  *        https://docs.openzeppelin.com/contracts/3.x/api/payment#PullPayment
  *        https://consensys.github.io/smart-contract-best-practices/recommendations/#favor-pull-over-push-for-external-calls
  */
@@ -110,11 +110,7 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
     event LogEscrowCredited(uint256 credit);
     event LogEscrowDebited(uint256 debit);
 
-    event LogInsuranceDepositRegistered(
-        bytes32 key,
-        uint256 deposit,
-        uint8 nonce
-    );
+    event LogInsuranceDepositRegistered(bytes32 key, uint256 deposit);
     event LogInsuranceDepositCredited(bytes32 key, uint256 credit);
     event LogInsuranceDepositWithdrawn(bytes32 key, uint256 debit);
 
@@ -220,14 +216,14 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
     /**
      * @dev Vote to pause contract operations
      */
-    function suspendService() public onlyConsortiumAffiliate {
+    function suspendService() external onlyConsortiumAffiliate {
         _registerVoteOperational(msg.sender, false);
     }
 
     /**
      * @dev Vote to resume contract operations
      */
-    function resumeService() public onlyConsortiumAffiliate {
+    function resumeService() external onlyConsortiumAffiliate {
         _registerVoteOperational(msg.sender, true);
     }
 
@@ -282,8 +278,8 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
     /**
      * @dev Let Admin add an Affiliate to the registration queue
      */
-    function createAffiliate(address _affiliate, string memory _title)
-        public
+    function createAffiliate(address _affiliate, string calldata _title)
+        external
         onlyAdmin
         onlyOperational
     {
@@ -305,7 +301,7 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
      * @dev Let a Consortium Affiliate vote for a registered candidate.
      */
     function approveAffiliate(address _affiliate)
-        public
+        external
         onlyConsortiumAffiliate
         onlyOperational
     {
@@ -351,7 +347,7 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
 
     // ----------------- INSURANCE CAPITAL AND PREMIUMS -----------------
     function depositMebership()
-        public
+        external
         payable
         onlyApprovedAffiliate
         onlyConsortiumFee
@@ -373,7 +369,7 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
     }
 
     function fundConsortium()
-        public
+        external
         payable
         onlyConsortiumAffiliate
         onlyOperational
@@ -391,7 +387,7 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
     }
 
     function depositInsurance()
-        public
+        external
         payable
         onlyMaxInsurance
         onlyMaxGuarantee
@@ -399,39 +395,22 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
         onlyOperational
         returns (bytes32)
     {
-        uint8 _nonce = _getPseudoRandom();
         bytes32 key = keccak256(
-            abi.encodePacked(msg.sender, block.timestamp, _nonce)
+            abi.encodePacked(msg.sender, block.timestamp, _getPseudoRandom())
         );
         insuranceDeposit[key] = msg.value;
 
         _creditEscrow(msg.value);
 
-        emit LogInsuranceDepositRegistered(key, insuranceDeposit[key], _nonce);
+        emit LogInsuranceDepositRegistered(key, insuranceDeposit[key]);
         return key;
-    }
-
-    function _getPseudoRandom() internal returns (uint8) {
-        uint8 maxValue = 100;
-
-        uint8 random = uint8(
-            uint256(
-                keccak256(abi.encodePacked(blockhash(block.number - nonce++)))
-            ) % maxValue
-        );
-
-        if (nonce > 250) {
-            nonce = 0; // Can only fetch blockhashes for last 256 blocks so we adapt
-        }
-
-        return random;
     }
 
     /**
      * @dev Lets Admin credit consortium a non-reedemable insurance deposit.
      */
     function creditInsurance(bytes32 _key)
-        public
+        external
         onlyAdmin
         onlyValidKey(_key)
         onlyOperational
@@ -444,35 +423,38 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
     }
 
     /**
-     * @dev Credits Admin with the registered insurance premium, only if
+     * @dev Lets Admin credit insuree escrow the registered insurance premium,
+     *      only if
      *      contract balance >= consortium + escrow balance (StopLoss).
      */
-    function withdrawInsurance(bytes32 _key)
-        public
+    function creditPremium(bytes32 _key, address _insuree)
+        external
         stopLoss
         onlyAdmin
         onlyValidKey(_key)
         onlyOperational
     {
-        uint256 deposit = insuranceDeposit[_key];
-        uint256 premium = deposit.mul(settings.INSURANCE_PREMIUM_FACTOR()).div(
-            100
-        );
-
-        require(consortium.balance.add(consortium.escrow) >= premium);
-
-        _burnKey(_key);
-        _debitEscrow(deposit);
-        _debitConsortium(premium.sub(deposit));
-
-        _asyncTransfer(msg.sender, premium);
+        _pullPremiumToEscrow(_key, _insuree);
     }
 
-    /*
-    function withdrawInsurance(bytes32 _key, address _insuree)
-        public
+    /**
+     * @dev Credits Admin with the registered insurance premium,
+     *      only if
+     *      contract balance >= consortium + escrow balance (StopLoss).
+     */
+    function withdrawInsurance(bytes32 _key)
+        external
         stopLoss
         onlyAdmin
+        onlyValidKey(_key)
+        onlyOperational
+    {
+        _pullPremiumToEscrow(_key, msg.sender);
+    }
+
+    function _pullPremiumToEscrow(bytes32 _key, address _insuree)
+        internal
+        stopLoss
         onlyValidKey(_key)
         onlyOperational
     {
@@ -488,7 +470,7 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
         _debitConsortium(premium.sub(deposit));
 
         _asyncTransfer(_insuree, premium);
-    }*/
+    }
 
     /**
      * @dev Invalidates key to prevent reentrancy in credit and withdraw insurance
@@ -520,6 +502,22 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
     function _debitEscrow(uint256 debit) internal {
         consortium.escrow = consortium.escrow.sub(debit);
         emit LogEscrowDebited(debit);
+    }
+
+    function _getPseudoRandom() internal returns (uint8) {
+        uint8 maxValue = 100;
+
+        uint8 random = uint8(
+            uint256(
+                keccak256(abi.encodePacked(blockhash(block.number - nonce++)))
+            ) % maxValue
+        );
+
+        if (nonce > 250) {
+            nonce = 0; // Can only fetch blockhashes for last 256 blocks
+        }
+
+        return random;
     }
 
     /**
