@@ -138,7 +138,12 @@ contract("FlightInsuranceHandler", async (accounts) => {
     });
 
     it(`lets request flight status`, async () => {
-      // assert LogFlightStatusRequested
+      let tx = await insuranceHandler.requestFlightStatus(
+        wrightBrothers,
+        flight_1,
+        1111
+      );
+      truffleAssert.eventEmitted(tx, "LogFlightStatusRequested");
     });
   });
 });
