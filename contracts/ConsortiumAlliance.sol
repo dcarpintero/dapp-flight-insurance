@@ -95,6 +95,8 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
     mapping(bytes32 => uint256) private insuranceDeposit;
 
     // ----------------- EVENTS -----------------
+    event LogAdminRegistered(address admin);
+
     event LogAffiliateRegistered(address indexed affiliate, string title);
     event LogAffiliateApproved(address indexed affiliate, string title);
     event LogAffiliateFunded(
@@ -202,6 +204,12 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
         settings = ConsortiumSettings(_settings);
         _setupRole(settings.ADMIN_ROLE(), msg.sender);
         consortium.operational.status = true;
+
+        emit LogAdminRegistered(msg.sender);
+    }
+
+    function addAdminRole(address _address) external onlyAdmin onlyOperational {
+        _setupRole(settings.ADMIN_ROLE(), _address);
     }
 
     // ----------------- OPERATIONAL CONSENSUS -----------------
@@ -322,13 +330,22 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
         _updateMembershipStatus(_affiliate);
     }
 
-    function isConsortiumAffiliate(address _affiliate)
+    function isConsortiumAffiliate(address _address)
         external
         view
         onlyOperational
         returns (bool)
     {
-        return hasRole(settings.CONSORTIUM_ROLE(), _affiliate);
+        return hasRole(settings.CONSORTIUM_ROLE(), _address);
+    }
+
+    function isAdmin(address _address)
+        public
+        view
+        onlyOperational
+        returns (bool)
+    {
+        return hasRole(settings.ADMIN_ROLE(), _address);
     }
 
     function _updateMembershipStatus(address _affiliate) private {
