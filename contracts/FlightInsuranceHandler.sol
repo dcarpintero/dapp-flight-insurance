@@ -66,6 +66,7 @@ contract FlightInsuranceHandler is Ownable, AccessControl, PullPayment {
     );
 
     event LogFlightStatusRequested(
+        bytes32 key,
         uint8 index,
         address indexed airline,
         string flight,
@@ -78,7 +79,12 @@ contract FlightInsuranceHandler is Ownable, AccessControl, PullPayment {
         bytes32 flight
     );
 
+    event LogInsureeCredited(bytes32 flight, bytes32 key, address insuree);
+    event LogConsortiumCredited(bytes32 flight, bytes32 key);
+
     // ----------------- MODIFIERS -----------------
+    event LogAdminRegistered(address admin);
+
     modifier onlyOperational() {
         require(isOperational(), "Contract is currently not operational");
         _;
@@ -118,10 +124,20 @@ contract FlightInsuranceHandler is Ownable, AccessControl, PullPayment {
     constructor(address _consortiumAlliance) public {
         consortium = ConsortiumAlliance(_consortiumAlliance);
         _setupRole(consortium.settings().ADMIN_ROLE(), msg.sender);
+        emit LogAdminRegistered(msg.sender);
     }
 
     function isOperational() public view returns (bool) {
         return consortium.isOperational();
+    }
+
+    function isAdmin(address _address)
+        public
+        view
+        onlyOperational
+        returns (bool)
+    {
+        return hasRole(consortium.settings().ADMIN_ROLE(), _address);
     }
 
     /**
@@ -186,20 +202,24 @@ contract FlightInsuranceHandler is Ownable, AccessControl, PullPayment {
             isOpen: true
         });
 
-        emit LogFlightStatusRequested(index, airline, flight, timestamp);
+        emit LogFlightStatusRequested(key, index, airline, flight, timestamp);
     }
 
     /**
      * @dev Called after oracles have reached consensus on flight status
      */
 
-    function _processFlightStatus(
+    function processFlightStatus(
         bytes32 requestKey,
         address airline,
         bytes32 flight,
         uint256 timestamp,
         FlightStatus status
-    ) internal onlyValidResponse(requestKey) {
+    )
+        external
+        // TO-DO:: onlyOracle, onlyAdmin
+        onlyValidResponse(requestKey)
+    {
         require(
             status != FlightStatus.UNKNOWN,
             "Unknown FlightStatus cannot be processed"
@@ -229,7 +249,8 @@ contract FlightInsuranceHandler is Ownable, AccessControl, PullPayment {
 
             if (!insurances[key].redeemed) {
                 _burnInsuranceKey(key);
-                consortium.creditPremium(key, insurances[key].insuree);
+                consortium.creditPremium(key, insurances[key].insuree); // delegate call
+                emit LogInsureeCredited(flight, key, insurances[key].insuree);
             }
         }
     }
@@ -243,13 +264,15 @@ contract FlightInsuranceHandler is Ownable, AccessControl, PullPayment {
 
             if (!insurances[key].redeemed) {
                 _burnInsuranceKey(key);
-                consortium.creditInsurance(key);
+                consortium.creditInsurance(key); // delegate call
+                emit LogConsortiumCredited(flight, key);
             }
         }
     }
 
     /**
-     * @dev Invalidates key to prevent reentrancy in credit and withdraw insurance
+     * @dev Invalidates key to prevent reentrancy
+     *      when crediting insurees and consortium
      */
     function _burnInsuranceKey(bytes32 key) internal {
         insurances[key].redeemed = true;
