@@ -171,7 +171,7 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
         _;
     }
 
-    modifier onlyMaxInsurance() {
+    modifier onlyInsuranceFee() {
         require(
             (msg.value > 0) && (msg.value <= settings.INSURANCE_MAX_FEE()),
             "Unexpected insurance deposit"
@@ -179,7 +179,7 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
         _;
     }
 
-    modifier onlyMaxGuarantee() {
+    modifier onlyGuarantee() {
         require(
             address(this).balance >=
                 consortium.escrow.mul(settings.INSURANCE_PREMIUM_FACTOR()).div(
@@ -322,6 +322,15 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
         _updateMembershipStatus(_affiliate);
     }
 
+    function isConsortiumAffiliate(address _affiliate)
+        external
+        view
+        onlyOperational
+        returns (bool)
+    {
+        return hasRole(settings.CONSORTIUM_ROLE(), _affiliate);
+    }
+
     function _updateMembershipStatus(address _affiliate) private {
         if (_hasReachedConsortiumConsensus(_affiliate)) {
             affiliates[_affiliate].status = MembershipStatus.APPROVED;
@@ -389,9 +398,8 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
     function depositInsurance()
         external
         payable
-        onlyMaxInsurance
-        onlyMaxGuarantee
-        onlyAdmin
+        onlyInsuranceFee
+        onlyGuarantee
         onlyOperational
         returns (bytes32)
     {
