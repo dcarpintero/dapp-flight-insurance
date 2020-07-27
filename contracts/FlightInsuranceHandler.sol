@@ -229,7 +229,7 @@ contract FlightInsuranceHandler is Ownable, AccessControl, PullPayment {
 
             if (!insurances[key].redeemed) {
                 _burnInsuranceKey(key);
-                //consortium.withdrawInsurance(key, insurances[key].insuree);
+                consortium.creditPremium(key, insurances[key].insuree);
             }
         }
     }
