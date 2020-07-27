@@ -23,14 +23,7 @@ contract("ConsortiumAlliance", async (accounts) => {
 
   describe("Shall not allow reentrancy", function () {
     it(`lets Credit Insurance ONLY_ONCE`, async () => {
-      // given
       const deposit = INSURANCE_FEE;
-
-      // when
-      let key = await instance.depositInsurance.call({
-        from: admin,
-        value: deposit,
-      });
 
       const consortiumBalanceBefore = await instance.getConsortiumBalance.call();
 
@@ -38,6 +31,7 @@ contract("ConsortiumAlliance", async (accounts) => {
         from: admin,
         value: deposit,
       });
+      let key = deposit_tx.logs[1].args["key"]; // workaround to get the return value of depositInsuranceTX
 
       const consortiumEscrowBefore = await instance.getConsortiumEscrow.call();
 
@@ -88,15 +82,8 @@ contract("ConsortiumAlliance", async (accounts) => {
     });
 
     it(`lets Withdraw Insurance ONLY_ONCE`, async () => {
-      // given
       const deposit = INSURANCE_FEE;
       const premium_factor = 50;
-
-      // when
-      let key = await instance.depositInsurance.call({
-        from: admin,
-        value: deposit,
-      });
 
       const consortiumBalanceBefore = await instance.getConsortiumBalance.call();
 
@@ -105,7 +92,7 @@ contract("ConsortiumAlliance", async (accounts) => {
         value: deposit,
         nonce: await web3.eth.getTransactionCount(admin),
       });
-      truffleAssert.eventEmitted(deposit_tx, "LogInsuranceDepositRegistered");
+      let key = deposit_tx.logs[1].args["key"]; // workaround to get the return value of depositInsuranceTX
 
       const consortiumEscrowBefore = await instance.getConsortiumEscrow.call();
 
