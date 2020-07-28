@@ -19,6 +19,8 @@ contract("FlightInsuranceHandler", async (accounts) => {
   var insurance_F4_P5; // LATE_OTHER
 
   var request_key_F1;
+  var request_key_F2;
+  var request_key_F3;
 
   const FlightStatus = {
     UNKNOWN: 0,
@@ -42,32 +44,22 @@ contract("FlightInsuranceHandler", async (accounts) => {
 
     flight_1 = web3.utils.utf8ToHex("WB1111"); // LATE_AIRLINE
     flight_2 = web3.utils.utf8ToHex("WB2222"); // LATE_AIRLINE
-    flight_3 = web3.utils.utf8ToHex("KH1111"); // ONTIME
-    flight_4 = web3.utils.utf8ToHex("KH2222"); // LATE_OTHER
+    flight_3 = web3.utils.utf8ToHex("KH3333"); // ONTIME
+    flight_4 = web3.utils.utf8ToHex("KH4444"); // LATE_OTHER
 
     consortium = await ConsortiumAlliance.deployed();
     insuranceHandler = await FlightInsuranceHandler.deployed();
   });
 
   describe("Flight Insurance Workflow", function () {
-    it(`lets Admin be Admin`, async () => {
-      console.log("Consortium Admin: " + admin);
-      console.log("FlightInsuranceHandler Admin: " + admin);
-
-      assert.isTrue(await consortium.isAdmin(admin));
-      assert.isTrue(await insuranceHandler.isAdmin(admin));
-    });
-
     it(`lets add Delegate`, async () => {
-      console.log(
-        "FlightInsuranceHandler Address: " + FlightInsuranceHandler.address
-      );
-
-      await consortium.addAdminRole(FlightInsuranceHandler.address, {
+      await consortium.addDelegateRole(FlightInsuranceHandler.address, {
         from: admin,
       });
 
-      assert.isTrue(await consortium.isAdmin(FlightInsuranceHandler.address));
+      assert.isTrue(
+        await consortium.isDelegate(FlightInsuranceHandler.address)
+      );
     });
 
     it(`lets be operational after deployment`, async () => {
@@ -116,13 +108,13 @@ contract("FlightInsuranceHandler", async (accounts) => {
     });
 
     it(`lets register Kitty Hawk' flights`, async () => {
-      let flight_tx_3 = await insuranceHandler.registerFlight(flight_3, 1111, {
+      let flight_tx_3 = await insuranceHandler.registerFlight(flight_3, 3333, {
         from: KittyHawk,
       });
       truffleAssert.eventEmitted(flight_tx_3, "LogFlightRegistered");
       flight_key_3 = flight_tx_3.logs[0].args["key"];
 
-      let flight_tx_4 = await insuranceHandler.registerFlight(flight_4, 2222, {
+      let flight_tx_4 = await insuranceHandler.registerFlight(flight_4, 4444, {
         from: wrightBrothers,
       });
       truffleAssert.eventEmitted(flight_tx_4, "LogFlightRegistered");
@@ -169,19 +161,35 @@ contract("FlightInsuranceHandler", async (accounts) => {
     });
 
     it(`lets request flight status`, async () => {
-      let tx = await insuranceHandler.requestFlightStatus(
+      let tx_1 = await insuranceHandler.requestFlightStatus(
         wrightBrothers,
         flight_1,
         1111
       );
-      truffleAssert.eventEmitted(tx, "LogFlightStatusRequested");
-      request_key_F1 = tx.logs[0].args["key"];
+      truffleAssert.eventEmitted(tx_1, "LogFlightStatusRequested");
+      request_key_F1 = tx_1.logs[0].args["key"];
+
+      let tx_2 = await insuranceHandler.requestFlightStatus(
+        wrightBrothers,
+        flight_2,
+        2222
+      );
+      truffleAssert.eventEmitted(tx_2, "LogFlightStatusRequested");
+      request_key_F2 = tx_2.logs[0].args["key"];
+
+      let tx_3 = await insuranceHandler.requestFlightStatus(
+        KittyHawk,
+        flight_3,
+        3333
+      );
+      truffleAssert.eventEmitted(tx_3, "LogFlightStatusRequested");
+      request_key_F3 = tx_3.logs[0].args["key"];
     });
 
-    it(`lets process flight status`, async () => {
+    it(`lets process flight status - LATE_AIRLINE - 1 Passenger`, async () => {
       let status_F1 = FlightStatus.LATE_AIRLINE;
 
-      let tx = await insuranceHandler.processFlightStatus(
+      let process_tx_1 = await insuranceHandler.processFlightStatus(
         request_key_F1,
         wrightBrothers,
         flight_1,
@@ -191,8 +199,42 @@ contract("FlightInsuranceHandler", async (accounts) => {
           from: admin,
         }
       );
-      truffleAssert.eventEmitted(tx, "LogFlightStatusProcessed");
-      truffleAssert.eventEmitted(tx, "LogInsureeCredited"); // insuree: , check balance:
+      truffleAssert.eventEmitted(process_tx_1, "LogFlightStatusProcessed");
+      truffleAssert.eventEmitted(process_tx_1, "LogInsureeCredited");
+    });
+
+    it(`lets process flight status - LATE_AIRLINE - 2 Passengers`, async () => {
+      let status_F2 = FlightStatus.LATE_AIRLINE;
+
+      let process_tx_2 = await insuranceHandler.processFlightStatus(
+        request_key_F2,
+        wrightBrothers,
+        flight_2,
+        2222,
+        status_F2,
+        {
+          from: admin,
+        }
+      );
+      truffleAssert.eventEmitted(process_tx_2, "LogFlightStatusProcessed");
+      truffleAssert.eventEmitted(process_tx_2, "LogInsureeCredited");
+    });
+
+    it(`lets process flight status - ON_TIME`, async () => {
+      let status_F3 = FlightStatus.ON_TIME;
+
+      let process_tx_3 = await insuranceHandler.processFlightStatus(
+        request_key_F3,
+        KittyHawk,
+        flight_3,
+        3333,
+        status_F3,
+        {
+          from: admin,
+        }
+      );
+      truffleAssert.eventEmitted(process_tx_3, "LogFlightStatusProcessed");
+      truffleAssert.eventEmitted(process_tx_3, "LogConsortiumCredited");
     });
   });
 });
