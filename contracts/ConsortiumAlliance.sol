@@ -44,8 +44,9 @@ import "./ConsortiumSettings.sol";
  *      - Consortium affiliates fund insurance capital and agree on new members
  *        and operational status.
  *
- *      - Admin (contract owner) handles insurance capital and premiums
- *        for distribution to insurees according to the business rules.
+ *      - DelegateCalls have been avoided by using ACL policies. The contract owner
+ *        (Admin) defines a delegate or proxy (contract address) in charge of
+ *        handling insurance capital and premiums.
  *
  * Security:
  *      - Stop Loss.
@@ -95,7 +96,7 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
     mapping(bytes32 => uint256) private insuranceDeposit;
 
     // ----------------- EVENTS -----------------
-    event LogAdminRegistered(address admin);
+    event LogDelegateRegistered(address admin);
 
     event LogAffiliateRegistered(address indexed affiliate, string title);
     event LogAffiliateApproved(address indexed affiliate, string title);
@@ -145,6 +146,14 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
         require(
             hasRole(settings.ADMIN_ROLE(), msg.sender),
             "Caller is not Admin"
+        );
+        _;
+    }
+
+    modifier onlyDelegate() {
+        require(
+            hasRole(settings.DELEGATE_ROLE(), msg.sender),
+            "Caller is not Delegate"
         );
         _;
     }
@@ -204,12 +213,17 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
         settings = ConsortiumSettings(_settings);
         _setupRole(settings.ADMIN_ROLE(), msg.sender);
         consortium.operational.status = true;
-
-        emit LogAdminRegistered(msg.sender);
     }
 
-    function addAdminRole(address _address) external onlyAdmin onlyOperational {
-        _setupRole(settings.ADMIN_ROLE(), _address);
+    function addDelegateRole(address _address)
+        external
+        onlyAdmin
+        onlyOperational
+    {
+        require(_address != address(0), "Delegate cannot be the zero address");
+
+        _setupRole(settings.DELEGATE_ROLE(), _address);
+        emit LogDelegateRegistered(_address);
     }
 
     // ----------------- OPERATIONAL CONSENSUS -----------------
@@ -339,13 +353,13 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
         return hasRole(settings.CONSORTIUM_ROLE(), _address);
     }
 
-    function isAdmin(address _address)
-        public
+    function isDelegate(address _address)
+        external
         view
         onlyOperational
         returns (bool)
     {
-        return hasRole(settings.ADMIN_ROLE(), _address);
+        return hasRole(settings.DELEGATE_ROLE(), _address);
     }
 
     function _updateMembershipStatus(address _affiliate) private {
@@ -417,6 +431,7 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
         payable
         onlyInsuranceFee
         onlyGuarantee
+        onlyDelegate
         onlyOperational
         returns (bytes32)
     {
@@ -432,13 +447,14 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
     }
 
     /**
-     * @dev Lets Admin credit consortium a non-reedemable insurance deposit.
+     * @dev Lets Delegate (contract) credit consortium
+     *      a non-reedemable insurance deposit.
      */
-    function creditInsurance(bytes32 _key)
+    function creditConsortium(bytes32 _key)
         external
-        onlyAdmin
-        onlyValidKey(_key)
+        onlyDelegate
         onlyOperational
+        onlyValidKey(_key)
     {
         uint256 credit = insuranceDeposit[_key];
 
@@ -448,18 +464,29 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
     }
 
     /**
-     * @dev Lets Admin credit insuree escrow the registered insurance premium,
-     *      only if
-     *      contract balance >= consortium + escrow balance (StopLoss).
+     * @dev Lets Delegate (contract) credit insuree escrow the insurance premium.
+     *
+     *      StopLoss: contract balance >= consortium + escrow balance
      */
-    function creditPremium(bytes32 _key, address _insuree)
+    function creditInsuree(bytes32 _key, address _insuree)
         external
         stopLoss
-        onlyAdmin
-        onlyValidKey(_key)
+        onlyDelegate
         onlyOperational
+        onlyValidKey(_key)
     {
-        _pullPremiumToEscrow(_key, _insuree);
+        uint256 deposit = insuranceDeposit[_key];
+        uint256 premium = deposit.mul(settings.INSURANCE_PREMIUM_FACTOR()).div(
+            100
+        );
+
+        require(consortium.balance.add(consortium.escrow) >= premium);
+
+        _burnKey(_key);
+        _debitEscrow(deposit);
+        _debitConsortium(premium.sub(deposit));
+
+        _asyncTransfer(_insuree, premium);
     }
 
     /**
@@ -467,6 +494,7 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
      *      only if
      *      contract balance >= consortium + escrow balance (StopLoss).
      */
+    /*
     function withdrawInsurance(bytes32 _key)
         external
         stopLoss
@@ -475,8 +503,9 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
         onlyOperational
     {
         _pullPremiumToEscrow(_key, msg.sender);
-    }
+    }*/
 
+    /*
     function _pullPremiumToEscrow(bytes32 _key, address _insuree)
         internal
         stopLoss
@@ -495,7 +524,7 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
         _debitConsortium(premium.sub(deposit));
 
         _asyncTransfer(_insuree, premium);
-    }
+    }*/
 
     /**
      * @dev Invalidates key to prevent reentrancy in credit and withdraw insurance

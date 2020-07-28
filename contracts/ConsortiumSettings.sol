@@ -4,6 +4,7 @@ pragma solidity 0.6.2;
 
 contract ConsortiumSettings {
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
+    bytes32 public constant DELEGATE_ROLE = keccak256("DELEGATE_ROLE");
     bytes32 public constant CONSORTIUM_ROLE = keccak256("CONSORTIUM_ROLE");
     bytes32 public constant INSUREE_ROLE = keccak256("INSUREE_ROLE");
     bytes32 public constant ORACLE_ROLE = keccak256("ORACLE_ROLE");

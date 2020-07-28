@@ -249,7 +249,7 @@ contract FlightInsuranceHandler is Ownable, AccessControl, PullPayment {
 
             if (!insurances[key].redeemed) {
                 _burnInsuranceKey(key);
-                consortium.creditPremium(key, insurances[key].insuree); // delegate call
+                consortium.creditInsuree(key, insurances[key].insuree);
                 emit LogInsureeCredited(flight, key, insurances[key].insuree);
             }
         }
@@ -264,7 +264,7 @@ contract FlightInsuranceHandler is Ownable, AccessControl, PullPayment {
 
             if (!insurances[key].redeemed) {
                 _burnInsuranceKey(key);
-                consortium.creditInsurance(key); // delegate call
+                consortium.creditConsortium(key);
                 emit LogConsortiumCredited(flight, key);
             }
         }
