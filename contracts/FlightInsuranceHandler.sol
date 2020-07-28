@@ -100,8 +100,18 @@ contract FlightInsuranceHandler is Ownable, AccessControl, PullPayment {
         _;
     }
 
-    modifier onlyValidFlight(bytes32 key) {
+    modifier onlyValidFlightKey(bytes32 key) {
         require(flights[key].isRegistered, "Invalid flight key");
+        _;
+    }
+
+    modifier onlyValidFlight(
+        address airline,
+        bytes32 flight,
+        uint256 timestamp
+    ) {
+        bytes32 key = _getFlightKey(airline, flight, timestamp);
+        require(flights[key].isRegistered, "Invalid flight");
         _;
     }
 
@@ -163,7 +173,7 @@ contract FlightInsuranceHandler is Ownable, AccessControl, PullPayment {
     function registerFlightInsurance(bytes32 _flightKey)
         external
         payable
-        onlyValidFlight(_flightKey)
+        onlyValidFlightKey(_flightKey)
         onlyOperational
         returns (bytes32)
     {
@@ -210,6 +220,7 @@ contract FlightInsuranceHandler is Ownable, AccessControl, PullPayment {
         external
         // TO-DO:: onlyOracle, onlyAdmin
         onlyValidResponse(requestKey)
+        onlyValidFlight(airline, flight, timestamp)
     {
         require(
             status != FlightStatus.UNKNOWN,
@@ -217,6 +228,7 @@ contract FlightInsuranceHandler is Ownable, AccessControl, PullPayment {
         );
 
         bytes32 key = _getFlightKey(airline, flight, timestamp);
+
         flights[key].status = status;
         oracleResponses[requestKey].isOpen = false;
 
