@@ -9,9 +9,15 @@ contract("ConsortiumAlliance", async (accounts) => {
 
   before("setup contract", async () => {
     admin = accounts[0];
-    firstAffiliate = accounts[1];
+    delegate = accounts[1];
+    firstAffiliate = accounts[2];
+    insuree = accounts[3];
 
     instance = await ConsortiumAlliance.deployed();
+
+    await instance.addDelegateRole(delegate, {
+      from: admin,
+    });
 
     await instance.createAffiliate(firstAffiliate, "First firstAffiliate");
 
@@ -22,13 +28,13 @@ contract("ConsortiumAlliance", async (accounts) => {
   });
 
   describe("Shall not allow reentrancy", function () {
-    it(`lets Credit Insurance ONLY_ONCE`, async () => {
+    it(`lets Credit Consortium ONLY_ONCE`, async () => {
       const deposit = INSURANCE_FEE;
 
       const consortiumBalanceBefore = await instance.getConsortiumBalance.call();
 
-      let deposit_tx = await instance.depositInsurance({
-        from: admin,
+      let deposit_tx = await instance.depositInsurance(insuree, {
+        from: delegate,
         value: deposit,
       });
       let key = deposit_tx.logs[1].args["key"]; // workaround to get the return value of depositInsuranceTX
@@ -36,19 +42,19 @@ contract("ConsortiumAlliance", async (accounts) => {
       const consortiumEscrowBefore = await instance.getConsortiumEscrow.call();
 
       // ACCEPT FIRST CREDIT ATTEMPT
-      let credit_tx = await instance.creditInsurance(
+      let credit_tx = await instance.creditConsortium(
         web3.utils.hexToBytes(key),
         {
-          from: admin,
-          nonce: await web3.eth.getTransactionCount(admin),
+          from: delegate,
+          nonce: await web3.eth.getTransactionCount(delegate),
         }
       );
 
       // REJECT SECOND CREDIT ATTEMPT
       await truffleAssert.reverts(
-        instance.creditInsurance(web3.utils.hexToBytes(key), {
-          from: admin,
-          nonce: await web3.eth.getTransactionCount(admin),
+        instance.creditConsortium(web3.utils.hexToBytes(key), {
+          from: delegate,
+          nonce: await web3.eth.getTransactionCount(delegate),
         }),
         OnlyValidKey
       );
@@ -81,35 +87,32 @@ contract("ConsortiumAlliance", async (accounts) => {
       );
     });
 
-    it(`lets Withdraw Insurance ONLY_ONCE`, async () => {
+    it(`lets Credit Insuree ONLY_ONCE`, async () => {
       const deposit = INSURANCE_FEE;
       const premium_factor = 50;
 
       const consortiumBalanceBefore = await instance.getConsortiumBalance.call();
 
-      let deposit_tx = await instance.depositInsurance({
-        from: admin,
+      let deposit_tx = await instance.depositInsurance(insuree, {
+        from: delegate,
         value: deposit,
-        nonce: await web3.eth.getTransactionCount(admin),
+        nonce: await web3.eth.getTransactionCount(delegate),
       });
       let key = deposit_tx.logs[1].args["key"]; // workaround to get the return value of depositInsuranceTX
 
       const consortiumEscrowBefore = await instance.getConsortiumEscrow.call();
 
       // ACCEPT FIRST WITHDRAW ATTEMPT
-      let debit_tx = await instance.withdrawInsurance(
-        web3.utils.hexToBytes(key),
-        {
-          from: admin,
-          nonce: await web3.eth.getTransactionCount(admin),
-        }
-      );
+      let debit_tx = await instance.creditInsuree(web3.utils.hexToBytes(key), {
+        from: delegate,
+        nonce: await web3.eth.getTransactionCount(delegate),
+      });
 
       // REJECT SECOND WITHDRAW ATTEMPT
       await truffleAssert.reverts(
-        instance.withdrawInsurance(web3.utils.hexToBytes(key), {
-          from: admin,
-          nonce: await web3.eth.getTransactionCount(admin),
+        instance.creditInsuree(web3.utils.hexToBytes(key), {
+          from: delegate,
+          nonce: await web3.eth.getTransactionCount(delegate),
         }),
         OnlyValidKey
       );
