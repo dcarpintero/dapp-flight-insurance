@@ -4,6 +4,7 @@ const truffleAssert = require("truffle-assertions");
 
 contract("ConsortiumAlliance", function (accounts) {
   const OnlyAdmin = "Caller is not Admin";
+  const OnlyDelegate = "Caller is not Delegate";
   const OnlyApprovedAffiliate = "Caller is not an approved affiliate";
   const OnlyConsortiumAffiliate = "Caller is not a consortium Affiliate";
   const OnlyOperational = "Contract is currently not operational";
@@ -15,15 +16,24 @@ contract("ConsortiumAlliance", function (accounts) {
 
   before("setup contract", async () => {
     admin = accounts[0];
+    delegate = accounts[1];
 
-    firstAffiliate = accounts[1];
-    secondAffiliate = accounts[2];
-    newAffiliate = accounts[3];
+    firstAffiliate = accounts[2];
+    approvedAffiliate = accounts[2];
+    consortiumAffiliate = accounts[2];
+    secondAffiliate = accounts[3];
+    newAffiliate = accounts[4];
+    insuree = accounts[5];
 
+    nonDelegate = accounts[7];
     nonAdmin = accounts[8];
     nonAffiliate = accounts[9];
 
     instance = await ConsortiumAlliance.deployed();
+
+    await instance.addDelegateRole(delegate, {
+      from: admin,
+    });
 
     await instance.createAffiliate(firstAffiliate, "firstAffiliate");
     await instance.createAffiliate(secondAffiliate, "secondAffiliate");
@@ -32,13 +42,10 @@ contract("ConsortiumAlliance", function (accounts) {
       from: firstAffiliate,
       value: MEMBERSHIP_FEE,
     });
-
-    approvedAffiliate = accounts[1];
-    consortiumAffiliate = accounts[1];
   });
 
   describe("Roles & Permissions", function () {
-    describe("Admin Rights", function () {
+    describe("Admin & Delegate Rights", function () {
       it(`lets revert create affiliate if non-admin`, async () => {
         await truffleAssert.reverts(
           instance.createAffiliate(firstAffiliate, "affiliate", {
@@ -49,34 +56,34 @@ contract("ConsortiumAlliance", function (accounts) {
         );
       });
 
-      it(`lets revert deposit insurance if non-admin`, async () => {
+      it(`lets revert deposit insurance if non-delegate`, async () => {
         await truffleAssert.reverts(
           instance.depositInsurance({
-            from: nonAdmin,
+            from: nonDelegate,
             value: INSURANCE_FEE,
-            nonce: await web3.eth.getTransactionCount(nonAdmin),
+            nonce: await web3.eth.getTransactionCount(nonDelegate),
           }),
-          OnlyAdmin
+          OnlyDelegate
         );
       });
 
-      it(`lets revert credit insurance if non-admin`, async () => {
+      it(`lets revert credit insuree if non-delegate`, async () => {
         await truffleAssert.reverts(
-          instance.creditInsurance(INSURANCE_KEY, {
-            from: nonAdmin,
-            nonce: await web3.eth.getTransactionCount(nonAdmin),
+          instance.creditInsuree(INSURANCE_KEY, insuree, {
+            from: nonDelegate,
+            nonce: await web3.eth.getTransactionCount(nonDelegate),
           }),
-          OnlyAdmin
+          OnlyDelegate
         );
       });
 
-      it(`lets revert withdraw insurance if non-admin`, async () => {
+      it(`lets revert credit consortium if non-delegate`, async () => {
         await truffleAssert.reverts(
-          instance.withdrawInsurance(INSURANCE_KEY, {
-            from: nonAdmin,
-            nonce: await web3.eth.getTransactionCount(nonAdmin),
+          instance.creditConsortium(INSURANCE_KEY, {
+            from: nonDelegate,
+            nonce: await web3.eth.getTransactionCount(nonDelegate),
           }),
-          OnlyAdmin
+          OnlyDelegate
         );
       });
     });
@@ -168,35 +175,35 @@ contract("ConsortiumAlliance", function (accounts) {
 
         await truffleAssert.reverts(
           instance.depositInsurance({
-            from: nonAdmin,
+            from: delegate,
             value: INSURANCE_FEE,
-            nonce: await web3.eth.getTransactionCount(nonAdmin),
+            nonce: await web3.eth.getTransactionCount(delegate),
           }),
-          OnlyAdmin
+          OnlyOperational
         );
       });
 
-      it(`lets be not Operational - Credit Insurance`, async function () {
+      it(`lets be not Operational - Credit Insuree`, async function () {
         assert.isFalse(await instance.isOperational());
 
         await truffleAssert.reverts(
-          instance.creditInsurance(INSURANCE_KEY, {
-            from: nonAdmin,
-            nonce: await web3.eth.getTransactionCount(nonAdmin),
+          instance.creditInsuree(INSURANCE_KEY, insuree, {
+            from: delegate,
+            nonce: await web3.eth.getTransactionCount(delegate),
           }),
-          OnlyAdmin
+          OnlyOperational
         );
       });
 
-      it(`lets be not Operational - Withdraw Insurance`, async function () {
+      it(`lets be not Operational - Credit Consortium`, async function () {
         assert.isFalse(await instance.isOperational());
 
         await truffleAssert.reverts(
-          instance.withdrawInsurance(INSURANCE_KEY, {
-            from: nonAdmin,
-            nonce: await web3.eth.getTransactionCount(nonAdmin),
+          instance.creditConsortium(INSURANCE_KEY, {
+            from: delegate,
+            nonce: await web3.eth.getTransactionCount(delegate),
           }),
-          OnlyAdmin
+          OnlyOperational
         );
       });
 
