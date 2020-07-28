@@ -58,7 +58,7 @@ contract("ConsortiumAlliance", function (accounts) {
 
       it(`lets revert deposit insurance if non-delegate`, async () => {
         await truffleAssert.reverts(
-          instance.depositInsurance({
+          instance.depositInsurance(insuree, {
             from: nonDelegate,
             value: INSURANCE_FEE,
             nonce: await web3.eth.getTransactionCount(nonDelegate),
@@ -69,7 +69,7 @@ contract("ConsortiumAlliance", function (accounts) {
 
       it(`lets revert credit insuree if non-delegate`, async () => {
         await truffleAssert.reverts(
-          instance.creditInsuree(INSURANCE_KEY, insuree, {
+          instance.creditInsuree(INSURANCE_KEY, {
             from: nonDelegate,
             nonce: await web3.eth.getTransactionCount(nonDelegate),
           }),
@@ -174,7 +174,7 @@ contract("ConsortiumAlliance", function (accounts) {
         assert.isFalse(await instance.isOperational());
 
         await truffleAssert.reverts(
-          instance.depositInsurance({
+          instance.depositInsurance(insuree, {
             from: delegate,
             value: INSURANCE_FEE,
             nonce: await web3.eth.getTransactionCount(delegate),
@@ -187,7 +187,7 @@ contract("ConsortiumAlliance", function (accounts) {
         assert.isFalse(await instance.isOperational());
 
         await truffleAssert.reverts(
-          instance.creditInsuree(INSURANCE_KEY, insuree, {
+          instance.creditInsuree(INSURANCE_KEY, {
             from: delegate,
             nonce: await web3.eth.getTransactionCount(delegate),
           }),
