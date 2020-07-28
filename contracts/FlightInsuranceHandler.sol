@@ -35,12 +35,6 @@ contract FlightInsuranceHandler is Ownable, AccessControl, PullPayment {
     bytes32[] private flightKeys;
 
     // ----------------- FLIGHT INSURANCE -----------------
-    struct FlightInsurance {
-        address insuree;
-        uint256 deposit;
-        bool redeemed;
-    }
-    mapping(bytes32 => FlightInsurance) private insurances;
     mapping(bytes32 => bytes32[]) private flightInsurances;
 
     // ----------------- ORACLE RESPONSES -----------------
@@ -79,7 +73,7 @@ contract FlightInsuranceHandler is Ownable, AccessControl, PullPayment {
         bytes32 flight
     );
 
-    event LogInsureeCredited(bytes32 flight, bytes32 key, address insuree);
+    event LogInsureeCredited(bytes32 flight, bytes32 key);
     event LogConsortiumCredited(bytes32 flight, bytes32 key);
 
     // ----------------- MODIFIERS -----------------
@@ -173,13 +167,10 @@ contract FlightInsuranceHandler is Ownable, AccessControl, PullPayment {
         onlyOperational
         returns (bytes32)
     {
-        bytes32 insurance = consortium.depositInsurance.value(msg.value)();
+        bytes32 insurance = consortium.depositInsurance.value(msg.value)(
+            msg.sender
+        );
 
-        insurances[insurance] = FlightInsurance({
-            insuree: msg.sender,
-            deposit: msg.value,
-            redeemed: false
-        });
         flightInsurances[_flightKey].push(insurance);
 
         emit LogFlightInsuranceRegistered(insurance, _flightKey, msg.sender);
@@ -247,11 +238,8 @@ contract FlightInsuranceHandler is Ownable, AccessControl, PullPayment {
         for (uint256 i = 0; i < flightInsurances[flight].length; i++) {
             bytes32 key = flightInsurances[flight][i];
 
-            if (!insurances[key].redeemed) {
-                _burnInsuranceKey(key);
-                consortium.creditInsuree(key, insurances[key].insuree);
-                emit LogInsureeCredited(flight, key, insurances[key].insuree);
-            }
+            consortium.creditInsuree(key);
+            emit LogInsureeCredited(flight, key);
         }
     }
 
@@ -262,20 +250,9 @@ contract FlightInsuranceHandler is Ownable, AccessControl, PullPayment {
         for (uint256 i = 0; i < flightInsurances[flight].length; i++) {
             bytes32 key = flightInsurances[flight][i];
 
-            if (!insurances[key].redeemed) {
-                _burnInsuranceKey(key);
-                consortium.creditConsortium(key);
-                emit LogConsortiumCredited(flight, key);
-            }
+            consortium.creditConsortium(key);
+            emit LogConsortiumCredited(flight, key);
         }
-    }
-
-    /**
-     * @dev Invalidates key to prevent reentrancy
-     *      when crediting insurees and consortium
-     */
-    function _burnInsuranceKey(bytes32 key) internal {
-        insurances[key].redeemed = true;
     }
 
     // ----------------- UTILITY -----------------

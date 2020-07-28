@@ -9,11 +9,18 @@ contract("ConsortiumAlliance", async (accounts) => {
 
   before("setup contract", async () => {
     admin = accounts[0];
-    firstAffiliate = accounts[1];
-    secondAffiliate = accounts[2];
+    delegate = accounts[1];
+
+    firstAffiliate = accounts[2];
+    secondAffiliate = accounts[3];
+    insuree = accounts[4];
     nonAffiliate = accounts[9];
 
     instance = await ConsortiumAlliance.deployed();
+
+    await instance.addDelegateRole(delegate, {
+      from: admin,
+    });
   });
 
   describe("Affiliate Workflow", function () {
@@ -66,7 +73,7 @@ contract("ConsortiumAlliance", async (accounts) => {
       );
     });
 
-    it(`lets consortium suspendService()`, async () => {
+    it(`lets suspendService()`, async () => {
       // when
       await instance.suspendService({
         from: firstAffiliate,
@@ -76,7 +83,7 @@ contract("ConsortiumAlliance", async (accounts) => {
       assert.isFalse(await instance.isOperational());
     });
 
-    it(`lets consortium startService()`, async () => {
+    it(`lets startService()`, async () => {
       // when
       await instance.resumeService({
         from: firstAffiliate,
@@ -119,7 +126,7 @@ contract("ConsortiumAlliance", async (accounts) => {
   });
 
   describe("Insurance Workflow", function () {
-    it(`lets Admin register insurance deposit`, async () => {
+    it(`lets Delegate register insurance deposit`, async () => {
       // given
       const consortiumBalanceBefore = await instance.getConsortiumBalance.call();
       const consortiumEscrowBefore = await instance.getConsortiumEscrow.call();
@@ -127,15 +134,15 @@ contract("ConsortiumAlliance", async (accounts) => {
       const deposit = INSURANCE_FEE;
 
       // when
-      let deposit_tx = await instance.depositInsurance({
-        from: admin,
+      let deposit_tx = await instance.depositInsurance(insuree, {
+        from: delegate,
         value: deposit,
-        nonce: await web3.eth.getTransactionCount(admin),
+        nonce: await web3.eth.getTransactionCount(delegate),
       });
 
       // then
       // events
-      truffleAssert.eventEmitted(deposit_tx, "LogInsuranceDepositRegistered");
+      truffleAssert.eventEmitted(deposit_tx, "LogInsuranceRegistered");
       truffleAssert.eventEmitted(deposit_tx, "LogEscrowCredited");
 
       // then
@@ -161,29 +168,29 @@ contract("ConsortiumAlliance", async (accounts) => {
       );
     });
 
-    it(`lets Admin deposit and credit insurance to consortium`, async () => {
+    it(`lets Delegate deposit and credit insurance to consortium`, async () => {
       const deposit = INSURANCE_FEE;
 
       // --------------------- DEPOSIT INSURANCE ---------------------
       const consortiumBalanceBefore = await instance.getConsortiumBalance.call();
 
-      let deposit_tx = await instance.depositInsurance({
-        from: admin,
+      let deposit_tx = await instance.depositInsurance(insuree, {
+        from: delegate,
         value: deposit,
-        nonce: await web3.eth.getTransactionCount(admin),
+        nonce: await web3.eth.getTransactionCount(delegate),
       });
 
-      truffleAssert.eventEmitted(deposit_tx, "LogInsuranceDepositRegistered");
+      truffleAssert.eventEmitted(deposit_tx, "LogInsuranceRegistered");
       let key = deposit_tx.logs[1].args["key"]; // workaround to get the return value of depositInsuranceTX
 
-      // --------------------- CREDIT INSURANCE ---------------------
+      // ------------ CREDIT INSURANCE TO CONSORTIUM ------------
       const consortiumEscrowBefore = await instance.getConsortiumEscrow.call();
 
-      let credit_tx = await instance.creditInsurance(
+      let credit_tx = await instance.creditConsortium(
         web3.utils.hexToBytes(key),
         {
-          from: admin,
-          nonce: await web3.eth.getTransactionCount(admin),
+          from: delegate,
+          nonce: await web3.eth.getTransactionCount(delegate),
         }
       );
 
@@ -220,25 +227,22 @@ contract("ConsortiumAlliance", async (accounts) => {
       // --------------------- DEPOSIT INSURANCE ---------------------
       const consortiumBalanceBefore = await instance.getConsortiumBalance.call();
 
-      let deposit_tx = await instance.depositInsurance({
-        from: admin,
+      let deposit_tx = await instance.depositInsurance(insuree, {
+        from: delegate,
         value: deposit,
-        nonce: await web3.eth.getTransactionCount(admin),
+        nonce: await web3.eth.getTransactionCount(delegate),
       });
 
-      truffleAssert.eventEmitted(deposit_tx, "LogInsuranceDepositRegistered");
+      truffleAssert.eventEmitted(deposit_tx, "LogInsuranceRegistered");
       let key = deposit_tx.logs[1].args["key"]; // workaround to get the return value of depositInsuranceTX
 
-      // --------------------- WITHDRAW INSURANCE ---------------------
+      // ------------ CREDIT INSURANCE TO INSUREE ------------
       const consortiumEscrowBefore = await instance.getConsortiumEscrow.call();
 
-      let debit_tx = await instance.withdrawInsurance(
-        web3.utils.hexToBytes(key),
-        {
-          from: admin,
-          nonce: await web3.eth.getTransactionCount(admin),
-        }
-      );
+      let debit_tx = await instance.creditInsuree(web3.utils.hexToBytes(key), {
+        from: delegate,
+        nonce: await web3.eth.getTransactionCount(delegate),
+      });
 
       const consortiumEscrowAfter = await instance.getConsortiumEscrow.call();
       const consortiumBalanceAfter = await instance.getConsortiumBalance.call();
@@ -275,15 +279,16 @@ contract("ConsortiumAlliance", async (accounts) => {
       const withdraw_amount = web3.utils.toBN(deposit).add(premium);
 
       // ------  ASSERT PAYEE CAN WITHDRAW THE INSURANCE PREMIUM ------
-      assert.equal(Number(await instance.payments(admin)), withdraw_amount);
+      assert.equal(Number(await instance.payments(insuree)), withdraw_amount);
 
-      const payeeBalanceBefore = await web3.eth.getBalance(admin);
-      let wdrw_tx = await instance.withdrawPayments(admin);
-      const payeeBalanceAfter = await web3.eth.getBalance(admin);
+      const payeeBalanceBefore = await web3.eth.getBalance(insuree);
+      let wdrw_tx = await instance.withdrawPayments(insuree, { from: insuree });
+      const payeeBalanceAfter = await web3.eth.getBalance(insuree);
 
-      assert.equal(Number(await instance.payments(admin)), 0);
+      assert.equal(Number(await instance.payments(insuree)), 0);
 
       const tx = await web3.eth.getTransaction(wdrw_tx.tx);
+
       let gasPrice = tx.gasPrice;
       let gasUsed = wdrw_tx.receipt.gasUsed;
       const gas = web3.utils.toBN(gasPrice).mul(web3.utils.toBN(gasUsed));

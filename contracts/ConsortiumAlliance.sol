@@ -92,8 +92,13 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
     }
     mapping(address => Affiliate) private affiliates;
 
-    // ----------------- INSURANCE CAPITAL -----------------
-    mapping(bytes32 => uint256) private insuranceDeposit;
+    // ----------------- INSURANCES -----------------
+    struct Insurance {
+        address insuree;
+        uint256 deposit;
+        bool redeemed;
+    }
+    mapping(bytes32 => Insurance) insurances;
 
     // ----------------- EVENTS -----------------
     event LogDelegateRegistered(address admin);
@@ -113,9 +118,17 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
     event LogEscrowCredited(uint256 credit);
     event LogEscrowDebited(uint256 debit);
 
-    event LogInsuranceDepositRegistered(bytes32 key, uint256 deposit);
-    event LogInsuranceDepositCredited(bytes32 key, uint256 credit);
-    event LogInsuranceDepositWithdrawn(bytes32 key, uint256 debit);
+    event LogInsuranceRegistered(
+        bytes32 key,
+        address indexed insuree,
+        uint256 deposit
+    );
+    event LogInsuranceCredited_ToConsortium(bytes32 key, uint256 credit);
+    event LogInsuranceCredited_ToInsuree(
+        bytes32 key,
+        address indexed insuree,
+        uint256 premium
+    );
 
     event LogKeyBurnt(bytes32 key);
 
@@ -202,7 +215,7 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
     }
 
     modifier onlyValidKey(bytes32 _key) {
-        require(insuranceDeposit[_key] != 0, "Invalid insurance key");
+        require(!insurances[_key].redeemed, "Invalid insurance key");
         _;
     }
 
@@ -426,7 +439,7 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
         return consortium.escrow;
     }
 
-    function depositInsurance()
+    function depositInsurance(address _insuree)
         external
         payable
         onlyInsuranceFee
@@ -436,13 +449,21 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
         returns (bytes32)
     {
         bytes32 key = keccak256(
-            abi.encodePacked(msg.sender, block.timestamp, _getPseudoRandom())
+            abi.encodePacked(_insuree, block.timestamp, _getPseudoRandom())
         );
-        insuranceDeposit[key] = msg.value;
+        insurances[key] = Insurance({
+            insuree: _insuree,
+            deposit: msg.value,
+            redeemed: false
+        });
 
         _creditEscrow(msg.value);
 
-        emit LogInsuranceDepositRegistered(key, insuranceDeposit[key]);
+        emit LogInsuranceRegistered(
+            key,
+            insurances[key].insuree,
+            insurances[key].deposit
+        );
         return key;
     }
 
@@ -456,7 +477,7 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
         onlyOperational
         onlyValidKey(_key)
     {
-        uint256 credit = insuranceDeposit[_key];
+        uint256 credit = insurances[_key].deposit;
 
         _burnKey(_key);
         _debitEscrow(credit);
@@ -468,14 +489,15 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
      *
      *      StopLoss: contract balance >= consortium + escrow balance
      */
-    function creditInsuree(bytes32 _key, address _insuree)
+    function creditInsuree(bytes32 _key)
         external
         stopLoss
         onlyDelegate
         onlyOperational
         onlyValidKey(_key)
     {
-        uint256 deposit = insuranceDeposit[_key];
+        address insuree = insurances[_key].insuree;
+        uint256 deposit = insurances[_key].deposit;
         uint256 premium = deposit.mul(settings.INSURANCE_PREMIUM_FACTOR()).div(
             100
         );
@@ -486,51 +508,14 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
         _debitEscrow(deposit);
         _debitConsortium(premium.sub(deposit));
 
-        _asyncTransfer(_insuree, premium);
+        _asyncTransfer(insuree, premium);
     }
-
-    /**
-     * @dev Credits Admin with the registered insurance premium,
-     *      only if
-     *      contract balance >= consortium + escrow balance (StopLoss).
-     */
-    /*
-    function withdrawInsurance(bytes32 _key)
-        external
-        stopLoss
-        onlyAdmin
-        onlyValidKey(_key)
-        onlyOperational
-    {
-        _pullPremiumToEscrow(_key, msg.sender);
-    }*/
-
-    /*
-    function _pullPremiumToEscrow(bytes32 _key, address _insuree)
-        internal
-        stopLoss
-        onlyValidKey(_key)
-        onlyOperational
-    {
-        uint256 deposit = insuranceDeposit[_key];
-        uint256 premium = deposit.mul(settings.INSURANCE_PREMIUM_FACTOR()).div(
-            100
-        );
-
-        require(consortium.balance.add(consortium.escrow) >= premium);
-
-        _burnKey(_key);
-        _debitEscrow(deposit);
-        _debitConsortium(premium.sub(deposit));
-
-        _asyncTransfer(_insuree, premium);
-    }*/
 
     /**
      * @dev Invalidates key to prevent reentrancy in credit and withdraw insurance
      */
     function _burnKey(bytes32 _key) internal {
-        insuranceDeposit[_key] = 0;
+        insurances[_key].redeemed = true;
         emit LogKeyBurnt(_key);
     }
 
