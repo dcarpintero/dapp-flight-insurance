@@ -49,16 +49,17 @@ Install dependencies
 npm install
 ```
 
-Launch Ganache
+Define mnemonic in .secret file
+
+```
+.secret
+truffle-config.js
+```
+
+Launch Ganache with the same mnemonic and create 50 accounts
 
 ```
 ganache-cli
-```
-
-Create .secret file with the same mnemonic as in gacache-cli
-
-```
-truffle-config.js
 ```
 
 Compile, test and migrate
