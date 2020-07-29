@@ -9,6 +9,9 @@ src/server/config.json
 /dapp/
 prod/
 
+# secrets
+.secret
+
 #VS
 .vscode
 
