@@ -15,6 +15,8 @@ Decentralized application aimed at providing passengers' insurance. A consortium
 
 - ConsortiumAlliance module aims at providing a generic insurance data model and fine operations for implementing affiliate registrations, voting rights, custody and management of insurance deposits.
 
+- ConsortiumSettings defines the project roles, consensus criteria and administrative fees of the project.
+
 - FlightInsuranceHandler is concerned with the specific business logic of airlines', flights' and insurances registration. As a trusted delegate of the ConsortiumAlliance, it triggers the credit of insurance deposits and premiums upon Oracle consensus on flight status.
 
 ### Unit and system tests
@@ -51,6 +53,12 @@ Launch Ganache
 
 ```
 ganache-cli
+```
+
+Create .secret file with the same mnemonic as in gacache-cli
+
+```
+truffle-config.js
 ```
 
 Compile, test and migrate
