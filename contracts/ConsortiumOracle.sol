@@ -6,23 +6,20 @@ import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 
-contract InsuranceOracle is Ownable, AccessControl {
+contract ConsortiumOracle is Ownable, AccessControl {
     using SafeMath for uint256;
 
-    bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
-    bytes32 public constant ORACLE_ROLE = keccak256("ORACLE_ROLE");
-
-    uint256 public constant ORACLE_MEMBERSHIP_FEE = 1 ether;
-    uint256 private constant ORACLE_CONSENSUS_RESPONSES = 3;
-
+    ConsortiumAlliance private consortium;
     uint8 private nonce = 0;
 
+    // ----------------- ORACLE -----------------
     struct Oracle {
         bool isRegistered;
         uint8[3] indexes;
     }
     mapping(address => Oracle) private oracles;
 
+    // ----------------- RESPONSES -----------------
     struct ResponseInfo {
         address requester;
         bool isOpen; // if open, oracle responses are accepted
