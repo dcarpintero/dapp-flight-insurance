@@ -101,7 +101,7 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
     mapping(bytes32 => Insurance) insurances;
 
     // ----------------- EVENTS -----------------
-    event LogDelegateRegistered(address admin);
+    event LogDelegateRegistered(address _address);
 
     event LogAffiliateRegistered(address indexed affiliate, string title);
     event LogAffiliateApproved(address indexed affiliate, string title);
