@@ -1,6 +1,5 @@
 const ConsortiumSettings = artifacts.require("ConsortiumSettings");
 const ConsortiumAlliance = artifacts.require("ConsortiumAlliance");
-const ConsortiumOracle = artifacts.require("ConsortiumOracle");
 const FlightInsuranceHandler = artifacts.require("FlightInsuranceHandler");
 const fs = require("fs");
 
@@ -9,11 +8,6 @@ module.exports = function (deployer) {
     await deployer.deploy(ConsortiumSettings);
     await deployer.deploy(ConsortiumAlliance, ConsortiumSettings.address);
     await deployer.deploy(FlightInsuranceHandler, ConsortiumAlliance.address);
-    await deployer.deploy(
-      ConsortiumOracle,
-      FlightInsuranceHandler.address,
-      ConsortiumSettings.address
-    );
 
     let config = {
       localhost: {
