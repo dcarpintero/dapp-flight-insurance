@@ -1,5 +1,7 @@
-var HDWalletProvider = require('truffle-hdwallet-provider')
-const mnemonic = fs.readFileSync('.secret').toString().trim()
+var HDWalletProvider = require("truffle-hdwallet-provider");
+
+const fs = require("fs");
+const mnemonic = fs.readFileSync(".secret").toString().trim();
 
 module.exports = {
   networks: {
@@ -7,13 +9,13 @@ module.exports = {
       provider: function () {
         return new HDWalletProvider(
           mnemonic,
-          'http://127.0.0.1:8545/',
+          "http://127.0.0.1:8545/",
           0,
           50,
-          false,
-        )
+          false
+        );
       },
-      network_id: '*',
+      network_id: "*",
     },
   },
 
@@ -25,7 +27,7 @@ module.exports = {
   // Configure your compilers
   compilers: {
     solc: {
-      version: '0.6.2', // Fetch exact version from solc-bin (default: truffle's version)
+      version: "0.6.2", // Fetch exact version from solc-bin (default: truffle's version)
       // docker: true,        // Use "0.5.1" you've installed locally with docker (default: false)
       // settings: {          // See the solidity docs for advice about optimization and evmVersion
       //  optimizer: {
@@ -36,4 +38,4 @@ module.exports = {
       // }
     },
   },
-}
+};
