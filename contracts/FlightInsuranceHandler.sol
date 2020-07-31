@@ -46,6 +46,8 @@ contract FlightInsuranceHandler is Ownable, AccessControl, PullPayment {
     mapping(bytes32 => ResponseInfo) private oracleResponses; // Key = hash(index, flight, timestamp)
 
     // ----------------- EVENTS -----------------
+    event LogDelegateRegistered(address _address);
+
     event LogAirlineRegistered(address indexed airline, string title);
     event LogFlightRegistered(
         address indexed airline,
@@ -92,6 +94,14 @@ contract FlightInsuranceHandler is Ownable, AccessControl, PullPayment {
         _;
     }
 
+    modifier onlyDelegate() {
+        require(
+            hasRole(consortium.settings().DELEGATE_ROLE(), msg.sender),
+            "Caller is not Delegate"
+        );
+        _;
+    }
+
     modifier onlyConsortiumAirline() {
         require(
             consortium.isConsortiumAffiliate(msg.sender),
@@ -129,6 +139,17 @@ contract FlightInsuranceHandler is Ownable, AccessControl, PullPayment {
         consortium = ConsortiumAlliance(_consortiumAlliance);
         _setupRole(consortium.settings().ADMIN_ROLE(), msg.sender);
         emit LogAdminRegistered(msg.sender);
+    }
+
+    function addDelegateRole(address _address)
+        external
+        onlyAdmin
+        onlyOperational
+    {
+        require(_address != address(0), "Delegate cannot be the zero address");
+
+        _setupRole(consortium.settings().DELEGATE_ROLE(), _address);
+        emit LogDelegateRegistered(_address);
     }
 
     function isOperational() public view returns (bool) {
@@ -211,34 +232,36 @@ contract FlightInsuranceHandler is Ownable, AccessControl, PullPayment {
      */
 
     function processFlightStatus(
-        bytes32 requestKey,
+        bytes32 responseKey,
         address airline,
         bytes32 flight,
         uint256 timestamp,
-        FlightStatus status
+        uint8 statusCode
     )
         external
-        // TO-DO:: onlyOracle, onlyAdmin
-        onlyValidResponse(requestKey)
+        //onlyDelegate
+        onlyValidResponse(responseKey)
         onlyValidFlight(airline, flight, timestamp)
     {
+        FlightStatus status = FlightStatus(statusCode);
+
         require(
             status != FlightStatus.UNKNOWN,
             "Unknown FlightStatus cannot be processed"
         );
 
-        bytes32 key = _getFlightKey(airline, flight, timestamp);
+        bytes32 flightKey = _getFlightKey(airline, flight, timestamp);
 
-        flights[key].status = status;
-        oracleResponses[requestKey].isOpen = false;
+        flights[flightKey].status = status;
+        oracleResponses[responseKey].isOpen = false;
 
-        if (flights[key].status == FlightStatus.LATE_AIRLINE) {
-            _creditInsuree(key);
+        if (flights[flightKey].status == FlightStatus.LATE_AIRLINE) {
+            _creditInsuree(flightKey);
         } else {
-            _creditConsortium(key);
+            _creditConsortium(flightKey);
         }
 
-        emit LogFlightStatusProcessed(key, airline, flight);
+        emit LogFlightStatusProcessed(flightKey, airline, flight);
     }
 
     /**
