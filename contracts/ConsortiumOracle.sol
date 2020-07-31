@@ -6,10 +6,14 @@ import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 
+import "./ConsortiumSettings.sol";
+import "./FlightInsuranceHandler.sol";
+
 contract ConsortiumOracle is Ownable, AccessControl {
     using SafeMath for uint256;
 
-    ConsortiumAlliance private consortium;
+    ConsortiumSettings private settings;
+    FlightInsuranceHandler private handler;
     uint8 private nonce = 0;
 
     // ----------------- ORACLE -----------------
@@ -19,34 +23,46 @@ contract ConsortiumOracle is Ownable, AccessControl {
     }
     mapping(address => Oracle) private oracles;
 
+    // ----------------- FLIGHT -----------------
+    enum FlightStatus {
+        UNKNOWN,
+        ON_TIME,
+        LATE_AIRLINE,
+        LATE_WEATHER,
+        LATE_TECHNICAL,
+        LATE_OTHER
+    }
+
     // ----------------- RESPONSES -----------------
     struct ResponseInfo {
         address requester;
         bool isOpen; // if open, oracle responses are accepted
-        mapping(uint8 => address[]) responses; // status => oracles
+        mapping(uint8 => address[]) responses; // statusCode => oracles
     }
     mapping(bytes32 => ResponseInfo) private oracleResponses; // Key = hash(index, flight, timestamp)
 
     // ----------------- EVENTS -----------------
+    event LogOracleRegistered(address oracle);
+
     event LogFlightStatus(
         address airline,
-        string flight,
+        bytes32 flight,
         uint256 timestamp,
-        uint8 status
+        FlightStatus status
     );
 
     event LogOracleReport(
         address airline,
-        string flight,
+        bytes32 flight,
         uint256 timestamp,
-        uint8 status
+        FlightStatus status
     );
 
     // ----------------- MODIFIERS -----------------
 
     modifier onlyOracle() {
         require(
-            hasRole(ORACLE_ROLE, msg.sender),
+            hasRole(settings.ORACLE_ROLE(), msg.sender),
             "Caller is not a registered Oracle"
         );
         _;
@@ -54,7 +70,7 @@ contract ConsortiumOracle is Ownable, AccessControl {
 
     modifier onlyOracleFee() {
         require(
-            msg.value == ORACLE_MEMBERSHIP_FEE,
+            msg.value == settings.ORACLE_MEMBERSHIP_FEE(),
             "Unexpected membership fee"
         );
         _;
@@ -73,7 +89,7 @@ contract ConsortiumOracle is Ownable, AccessControl {
     modifier onlyOpenResponse(
         uint8 index,
         address airline,
-        string memory flight,
+        bytes32 flight,
         uint256 timestamp
     ) {
         bytes32 key = _getResponseKey(index, airline, flight, timestamp);
@@ -85,8 +101,11 @@ contract ConsortiumOracle is Ownable, AccessControl {
     }
 
     // ----------------- CONSTRUCTOR -----------------
-    constructor() public {
-        _setupRole(ADMIN_ROLE, msg.sender);
+    constructor(address _flightInsuranceHandler, address _settings) public {
+        settings = ConsortiumSettings(_settings);
+        handler = FlightInsuranceHandler(_flightInsuranceHandler);
+
+        _setupRole(settings.ADMIN_ROLE(), msg.sender);
     }
 
     function registerOracle() external payable onlyOracleFee {
@@ -94,7 +113,9 @@ contract ConsortiumOracle is Ownable, AccessControl {
             isRegistered: true,
             indexes: _generateIndexes(msg.sender)
         });
-        _setupRole(ORACLE_ROLE, msg.sender);
+        _setupRole(settings.ORACLE_ROLE(), msg.sender);
+
+        emit LogOracleRegistered(msg.sender);
     }
 
     function getMyIndexes() external view onlyOracle returns (uint8[3] memory) {
@@ -108,7 +129,7 @@ contract ConsortiumOracle is Ownable, AccessControl {
     function submitOracleResponse(
         uint8 index,
         address airline,
-        string calldata flight,
+        bytes32 flight,
         uint256 timestamp,
         uint8 statusCode
     )
@@ -117,18 +138,33 @@ contract ConsortiumOracle is Ownable, AccessControl {
         onlyOpenResponse(index, airline, flight, timestamp)
     {
         bytes32 key = _getResponseKey(index, airline, flight, timestamp);
-        oracleResponses[key].responses[statusCode].push(msg.sender);
 
-        // Information isn't considered verified until at least ORACLE_CONSENSUS_RESPONSES
-        // oracles respond with the *** same *** information
-        emit LogOracleReport(airline, flight, timestamp, statusCode);
+        oracleResponses[key].responses[statusCode].push(msg.sender);
+        emit LogOracleReport(
+            airline,
+            flight,
+            timestamp,
+            FlightStatus(statusCode)
+        );
 
         if (
             oracleResponses[key].responses[statusCode].length >=
-            ORACLE_CONSENSUS_RESPONSES
+            settings.ORACLE_CONSENSUS_RESPONSES()
         ) {
-            emit LogFlightStatus(airline, flight, timestamp, statusCode);
-            //processFlightStatus(airline, flight, timestamp, statusCode);
+            emit LogFlightStatus(
+                airline,
+                flight,
+                timestamp,
+                FlightStatus(statusCode)
+            );
+
+            handler.processFlightStatus(
+                key,
+                airline,
+                flight,
+                timestamp,
+                uint8(statusCode)
+            );
         }
     }
 
@@ -136,7 +172,7 @@ contract ConsortiumOracle is Ownable, AccessControl {
     function _getResponseKey(
         uint8 index,
         address airline,
-        string memory flight,
+        bytes32 flight,
         uint256 timestamp
     ) internal pure returns (bytes32) {
         return keccak256(abi.encodePacked(index, airline, flight, timestamp));
