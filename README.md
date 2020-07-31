@@ -28,8 +28,6 @@ Decentralized application aimed at providing passengers' insurance. A consortium
 
 - TestFlightInsuranceHandler.js
 
-- TestOracle.js
-
 ### Dependencies
 
 - Solidity v0.6.2 (solc-js)
