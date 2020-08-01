@@ -168,7 +168,7 @@ contract("ConsortiumAlliance", async (accounts) => {
       );
     });
 
-    it(`lets Delegate deposit and credit insurance to consortium`, async () => {
+    it(`lets Delegate deposit insurance and credit it to consortium`, async () => {
       const deposit = INSURANCE_FEE;
 
       // --------------------- DEPOSIT INSURANCE ---------------------
@@ -219,7 +219,7 @@ contract("ConsortiumAlliance", async (accounts) => {
       );
     });
 
-    it(`lets Admin deposit and withdraw insurance premium for further distribution to insuree`, async () => {
+    it(`lets Delegate deposit insurance and credit premium to insuree`, async () => {
       const deposit = INSURANCE_FEE;
       const premium_factor = 50;
       const premium = web3.utils.toBN(deposit * (premium_factor / 100));
@@ -294,7 +294,9 @@ contract("ConsortiumAlliance", async (accounts) => {
       const gas = web3.utils.toBN(gasPrice).mul(web3.utils.toBN(gasUsed));
 
       assert.equal(
-        Number(payeeBalanceAfter) - Number(payeeBalanceBefore),
+        web3.utils
+          .toBN(payeeBalanceAfter)
+          .sub(web3.utils.toBN(payeeBalanceBefore)),
         Number(withdraw_amount) - Number(gas)
       );
     });

@@ -7,6 +7,7 @@ contract("FlightInsuranceHandler", async (accounts) => {
   const MEMBERSHIP_FEE = web3.utils.toWei("10", "ether");
   const INSURANCE_FEE = web3.utils.toWei("1", "ether");
   const ORACLE_FEE = web3.utils.toWei("1", "ether");
+  const TEST_ORACLES_COUNT = 20;
 
   var flight_key_1;
   var flight_key_2;
@@ -188,8 +189,8 @@ contract("FlightInsuranceHandler", async (accounts) => {
       request_key_F3 = tx_3.logs[0].args["key"];
     });
 
-    /*
-    it(`lets process flight status - LATE_AIRLINE - 1 Passenger`, async () => {
+    // _processFlightStatus is an internal function - this workflow is now in TestOracle.js
+    xit(`lets process flight status - LATE_AIRLINE - 1 Passenger`, async () => {
       let status_F1 = FlightStatus.LATE_AIRLINE;
 
       let process_tx_1 = await insuranceHandler._processFlightStatus(
@@ -204,10 +205,9 @@ contract("FlightInsuranceHandler", async (accounts) => {
       );
       truffleAssert.eventEmitted(process_tx_1, "LogFlightStatusProcessed");
       truffleAssert.eventEmitted(process_tx_1, "LogInsureeCredited");
-    });*/
+    });
 
-    /*
-    it(`lets process flight status - LATE_AIRLINE - 2 Passengers`, async () => {
+    xit(`lets process flight status - LATE_AIRLINE - 2 Passengers`, async () => {
       let status_F2 = FlightStatus.LATE_AIRLINE;
 
       let process_tx_2 = await insuranceHandler._processFlightStatus(
@@ -222,10 +222,9 @@ contract("FlightInsuranceHandler", async (accounts) => {
       );
       truffleAssert.eventEmitted(process_tx_2, "LogFlightStatusProcessed");
       truffleAssert.eventEmitted(process_tx_2, "LogInsureeCredited");
-    });*/
+    });
 
-    /*
-    it(`lets process flight status - ON_TIME`, async () => {
+    xit(`lets process flight status - ON_TIME`, async () => {
       let status_F3 = FlightStatus.ON_TIME;
 
       let process_tx_3 = await insuranceHandler._processFlightStatus(
@@ -240,80 +239,6 @@ contract("FlightInsuranceHandler", async (accounts) => {
       );
       truffleAssert.eventEmitted(process_tx_3, "LogFlightStatusProcessed");
       truffleAssert.eventEmitted(process_tx_3, "LogConsortiumCredited");
-    });*/
-  });
-
-  describe("Oracle Registration and Responses", function () {
-    it(`lets register 20+ oracles`, async () => {
-      let fee = ORACLE_FEE;
-
-      let tx = await insuranceHandler.registerOracle({
-        from: accounts[10],
-        value: fee,
-      });
-      truffleAssert.eventEmitted(tx, "LogOracleRegistered");
-
-      for (let i = 11; i <= 5; i++) {
-        tx = await insuranceHandler.registerOracle({
-          from: accounts[i],
-          value: fee,
-        });
-        truffleAssert.eventEmitted(tx, "LogOracleRegistered");
-      }
-    });
-
-    it(`lets submit oracle responses and trigger process flight`, async () => {
-      // request flight status
-      let req_4 = await insuranceHandler.requestFlightStatus(
-        KittyHawk,
-        flight_4,
-        4444
-      );
-      truffleAssert.eventEmitted(req_4, "LogFlightStatusRequested");
-      request_key_F4 = req_4.logs[0].args["key"];
-      let index = req_4.logs[0].args["index"];
-
-      // responses
-      let tx_1 = await insuranceHandler.submitOracleResponse(
-        index,
-        KittyHawk,
-        flight_4,
-        4444,
-        FlightStatus.LATE_AIRLINE,
-        { from: accounts[11] }
-      );
-      truffleAssert.eventEmitted(tx_1, "LogOracleReport");
-
-      let tx_2 = await insuranceHandler.submitOracleResponse(
-        index,
-        KittyHawk,
-        flight_4,
-        4444,
-        FlightStatus.LATE_AIRLINE,
-        { from: accounts[12] }
-      );
-      truffleAssert.eventEmitted(tx_2, "LogOracleReport");
-
-      let tx_3 = await insuranceHandler.submitOracleResponse(
-        index,
-        KittyHawk,
-        flight_4,
-        4444,
-        FlightStatus.LATE_TECHNICAL,
-        { from: accounts[13] }
-      );
-      truffleAssert.eventEmitted(tx_3, "LogOracleReport");
-
-      let tx_4 = await insuranceHandler.submitOracleResponse(
-        index,
-        KittyHawk,
-        flight_4,
-        4444,
-        FlightStatus.LATE_AIRLINE,
-        { from: accounts[14] }
-      );
-      truffleAssert.eventEmitted(tx_4, "LogOracleReport");
-      truffleAssert.eventEmitted(tx_4, "LogFlightStatus");
     });
   });
 });
