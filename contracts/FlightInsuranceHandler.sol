@@ -26,7 +26,7 @@ import "./ConsortiumAlliance.sol";
  *
  *      - Insurees shall withdraw the funds from said escrow account.
  *
- * @see ConsortiumAlliance
+ *      - see also ConsortiumAlliance contract.
  */
 contract FlightInsuranceHandler is Ownable, AccessControl, PullPayment {
     using SafeMath for uint256;
