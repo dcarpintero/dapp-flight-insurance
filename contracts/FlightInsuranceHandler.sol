@@ -9,6 +9,25 @@ import "@openzeppelin/contracts/payment/PullPayment.sol";
 
 import "./ConsortiumAlliance.sol";
 
+/**
+ * @title FlightInsuranceHandler
+ * @dev Provides specific business logic of airlines', flights' and insurances registration.
+ *
+ *      - As a delegate of ConsortiumAlliance, airlines are registered
+ *        as affiliates, passengers as insurees and flight insurances as
+ *        insurance deposits.
+ *
+ *      - Trusted Oracles match the request index code, and  agree on flight status
+ *        to resolve insurances.
+ *
+ *      - Unreedemable insurances are credited to the shared  consortium account,
+ *        whereas insurances for flights resolved with  LATE_AIRLINE status code
+ *        result in a escrow account credited with the premium.
+ *
+ *      - Insurees shall withdraw the funds from said escrow account.
+ *
+ * @see ConsortiumAlliance
+ */
 contract FlightInsuranceHandler is Ownable, AccessControl, PullPayment {
     using SafeMath for uint256;
 
@@ -269,6 +288,9 @@ contract FlightInsuranceHandler is Ownable, AccessControl, PullPayment {
         return insurance;
     }
 
+    /**
+     * @dev Register a new Oracle.
+     */
     function registerOracle() external payable onlyOracleFee {
         oracles[msg.sender] = Oracle({
             isRegistered: true,
@@ -316,7 +338,7 @@ contract FlightInsuranceHandler is Ownable, AccessControl, PullPayment {
         uint8 statusCode
     )
         external
-        //onlyTrustedOracle(index)
+        onlyTrustedOracle(index)
         onlyOpenResponse(index, airline, flight, timestamp)
     {
         bytes32 key = _getResponseKey(index, airline, flight, timestamp);
