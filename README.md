@@ -54,7 +54,7 @@ Define mnemonic in .secret file
 truffle-config.js
 ```
 
-Launch Ganache with the same mnemonic and create 50 accounts
+Launch Ganache with the same mnemonic and define 50 accounts
 
 ```
 ganache-cli
@@ -65,7 +65,14 @@ Compile, test and migrate
 ```
 truffle compile
 truffle test
-truffle migrate
+truffle migrate --reset
+```
+
+Launch the Server
+
+```
+npm run server
+
 ```
 
 Launch the DApp
