@@ -174,6 +174,10 @@ app.get('/oracles', (req, res) => {
   res.send(Backend.oracles)
 })
 
+app.get('/insuree/:address', (req, res) => {
+  res.send('insuree, balance, credit')
+})
+
 app.get('/airline/:address', async (req, res) => {
   var address = req.params.address
 
