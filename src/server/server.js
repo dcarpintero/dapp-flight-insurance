@@ -116,6 +116,27 @@ const Backend = {
 
     console.log('All flights have been registered')
   },
+
+  initOracles: async function () {
+    const ORACLE_FEE = web3.utils.toWei('1', 'ether')
+    let accounts = await web3.eth.getAccounts()
+
+    console.log('Registering Oracles...')
+
+    await insuranceHandler.methods.registerOracle().send({
+      from: accounts[10],
+      value: ORACLE_FEE,
+      gas: 500000,
+    })
+
+    const indexes = await insuranceHandler.methods
+      .getMyIndexes()
+      .call({ from: accounts[10] })
+
+    this.oracles.push({ address: accounts[10], indexes: indexes })
+
+    console.log('All Oracles have been registered')
+  },
 }
 
 /*
@@ -129,8 +150,9 @@ flightSuretyApp.events.OracleRequest(
   }
 );*/
 
-Backend.initAirlines()
-Backend.initFlights()
+//Backend.initAirlines()
+//Backend.initFlights()
+Backend.initOracles()
 
 const app = express()
 
@@ -146,6 +168,10 @@ app.get('/airlines', (req, res) => {
 
 app.get('/flights', (req, res) => {
   res.send(Backend.flights)
+})
+
+app.get('/oracles', (req, res) => {
+  res.send(Backend.oracles)
 })
 
 app.get('/airline/:address', async (req, res) => {
