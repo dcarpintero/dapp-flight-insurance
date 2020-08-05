@@ -1,3 +1,4 @@
+import ConsortiumSettings from '../../build/contracts/ConsortiumSettings.json'
 import ConsortiumAlliance from '../../build/contracts/ConsortiumAlliance.json'
 import FlightInsuranceHandler from '../../build/contracts/flightInsuranceHandler.json'
 
@@ -11,6 +12,11 @@ let web3 = new Web3(
   new Web3.providers.WebsocketProvider(config.url.replace('http', 'ws')),
 )
 web3.eth.defaultAccount = web3.eth.accounts[0]
+
+let settings = new web3.eth.Contract(
+  ConsortiumSettings.abi,
+  config.settingsAddress,
+)
 
 let consortium = new web3.eth.Contract(
   ConsortiumAlliance.abi,
@@ -27,7 +33,13 @@ const Backend = {
   flights: [],
   oracles: [],
 
-  initAirlines: async function () {
+  init: async function () {
+    //await this.registerAirlines()
+    //await this.registerFlights()
+    await this.registerOracles()
+  },
+
+  registerAirlines: async function () {
     let accounts = await web3.eth.getAccounts()
     let admin = accounts[0]
     let wrightBrothers = accounts[1]
@@ -61,7 +73,7 @@ const Backend = {
     console.log('\tKitty Hawk has been registered')
   },
 
-  initFlights: async function () {
+  registerFlights: async function () {
     let accounts = await web3.eth.getAccounts()
     let admin = accounts[0]
     let wrightBrothers = accounts[1]
@@ -117,25 +129,61 @@ const Backend = {
     console.log('All flights have been registered')
   },
 
-  initOracles: async function () {
+  registerOracles2: async function () {
     const ORACLE_FEE = web3.utils.toWei('1', 'ether')
+    const ORACLES_COUNT = 10
     let accounts = await web3.eth.getAccounts()
 
     console.log('Registering Oracles...')
 
-    await insuranceHandler.methods.registerOracle().send({
-      from: accounts[10],
-      value: ORACLE_FEE,
-      gas: 500000,
-    })
+    for (let i = 10; i <= ORACLES_COUNT; i++) {
+      await insuranceHandler.methods.registerOracle().send({
+        from: accounts[i],
+        value: ORACLE_FEE,
+        gas: 4712388,
+      })
+      const indexes = await insuranceHandler.methods
+        .getMyIndexes()
+        .call({ from: accounts[i] })
 
-    const indexes = await insuranceHandler.methods
-      .getMyIndexes()
-      .call({ from: accounts[10] })
+      this.oracles.push({ address: accounts[i], indexes: indexes })
+      console.log('\t oracle registered: ' + indexes)
+    }
+  },
 
-    this.oracles.push({ address: accounts[10], indexes: indexes })
+  registerOracles: async function () {
+    let accounts = await web3.eth.getAccounts()
+    const ORACLES_COUNT = 25
 
-    console.log('All Oracles have been registered')
+    settings.methods
+      .ORACLE_MEMBERSHIP_FEE()
+      .call()
+      .then((fee) => {
+        for (let a = 1; a < ORACLES_COUNT; a++) {
+          insuranceHandler.methods
+            .registerOracle()
+            .send({ from: accounts[a], value: fee, gas: 4000000 })
+            .then((result) => {
+              insuranceHandler.methods
+                .getMyIndexes()
+                .call({ from: accounts[a] })
+                .then((indexes) => {
+                  this.oracles.push({ address: accounts[a], indexes: indexes })
+                  console.log(
+                    'Oracle registered: ' + accounts[a] + ' indexes:' + indexes,
+                  )
+                })
+            })
+            .catch((error) => {
+              console.log(
+                'Error while registering oracles: ' +
+                  accounts[a] +
+                  ' Error: ' +
+                  error,
+              )
+            })
+        }
+      })
   },
 }
 
@@ -150,9 +198,7 @@ flightSuretyApp.events.OracleRequest(
   }
 );*/
 
-//Backend.initAirlines()
-//Backend.initFlights()
-Backend.initOracles()
+Backend.init()
 
 const app = express()
 
