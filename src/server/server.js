@@ -34,48 +34,42 @@ const Backend = {
   oracles: [],
 
   init: async function () {
-    //await this.registerAirlines()
+    let accounts = await web3.eth.getAccounts()
+    await this.registerAirline(accounts[1], 'Wright Brothers')
+    await this.registerAirline(accounts[2], 'Kitty Hawk')
+
     //await this.registerFlights()
-    await this.registerOracles()
+    //await this.registerOracles()
   },
 
-  registerAirlines: async function () {
+  registerAirline: async function (_address, _title) {
     let accounts = await web3.eth.getAccounts()
     let admin = accounts[0]
-    let wrightBrothers = accounts[1]
-    let kittyHawk = accounts[2]
-    const fee = web3.utils.toWei('10', 'ether')
+    let fee = await settings.methods.CONSORTIUM_MEMBERSHIP_FEE().call()
 
-    console.log('Registering Airlines...')
-
-    await consortium.methods
-      .createAffiliate(wrightBrothers, 'Wright Brothers')
-      .send({ from: admin, gas: 500000 })
-
-    await consortium.methods
-      .createAffiliate(kittyHawk, 'Kitty Hawk')
-      .send({ from: admin, gas: 500000 })
-
-    await consortium.methods.depositMebership().send({
-      from: wrightBrothers,
-      value: fee,
-      gas: 500000,
-    })
-    this.airlines.push({ title: 'Wright Brothers', address: wrightBrothers })
-    console.log('\tWright Brothers has been registered')
-
-    await consortium.methods.depositMebership().send({
-      from: kittyHawk,
-      value: fee,
-      gas: 500000,
-    })
-    this.airlines.push({ title: 'Kitty Hawk', address: kittyHawk })
-    console.log('\tKitty Hawk has been registered')
+    consortium.methods
+      .createAffiliate(_address, _title)
+      .send({ from: admin, gas: 4000000 })
+      .then((result) => {
+        consortium.methods
+          .depositMebership()
+          .send({
+            from: _address,
+            value: fee,
+            gas: 4000000,
+          })
+          .then((result) => {
+            this.airlines.push({ title: _title, address: _address })
+            console.log('\tAirline has been registered')
+          })
+      })
+      .catch((error) => {
+        console.log('\tError while registering airline: ' + error)
+      })
   },
 
   registerFlights: async function () {
     let accounts = await web3.eth.getAccounts()
-    let admin = accounts[0]
     let wrightBrothers = accounts[1]
     let kittyHawk = accounts[2]
 
@@ -129,28 +123,6 @@ const Backend = {
     console.log('All flights have been registered')
   },
 
-  registerOracles2: async function () {
-    const ORACLE_FEE = web3.utils.toWei('1', 'ether')
-    const ORACLES_COUNT = 10
-    let accounts = await web3.eth.getAccounts()
-
-    console.log('Registering Oracles...')
-
-    for (let i = 10; i <= ORACLES_COUNT; i++) {
-      await insuranceHandler.methods.registerOracle().send({
-        from: accounts[i],
-        value: ORACLE_FEE,
-        gas: 4712388,
-      })
-      const indexes = await insuranceHandler.methods
-        .getMyIndexes()
-        .call({ from: accounts[i] })
-
-      this.oracles.push({ address: accounts[i], indexes: indexes })
-      console.log('\t oracle registered: ' + indexes)
-    }
-  },
-
   registerOracles: async function () {
     let accounts = await web3.eth.getAccounts()
     const ORACLES_COUNT = 25
@@ -159,7 +131,7 @@ const Backend = {
       .ORACLE_MEMBERSHIP_FEE()
       .call()
       .then((fee) => {
-        for (let a = 1; a < ORACLES_COUNT; a++) {
+        for (let a = 10; a < ORACLES_COUNT; a++) {
           insuranceHandler.methods
             .registerOracle()
             .send({ from: accounts[a], value: fee, gas: 4000000 })
