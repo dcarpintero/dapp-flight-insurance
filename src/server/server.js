@@ -35,11 +35,23 @@ const Backend = {
 
   init: async function () {
     let accounts = await web3.eth.getAccounts()
-    await this.registerAirline(accounts[1], 'Wright Brothers')
-    await this.registerAirline(accounts[2], 'Kitty Hawk')
+    let WB = accounts[1]
+    let KH = accounts[2]
 
-    //await this.registerFlights()
-    //await this.registerOracles()
+    let date_f1 = new Date('1 August 2022 08:45:00 GMT').getMilliseconds()
+    let date_f2 = new Date('1 August 2022 08:45:00 GMT').getMilliseconds()
+    let date_f3 = new Date('1 August 2022 08:45:00 GMT').getMilliseconds()
+    let date_f4 = new Date('1 August 2022 08:45:00 GMT').getMilliseconds()
+
+    await this.registerAirline(WB, 'Wright Brothers')
+    await this.registerAirline(KH, 'Kitty Hawk')
+
+    await this.registerFlight(WB, 'WB1111', date_f1)
+    await this.registerFlight(WB, 'WB2222', date_f2)
+    await this.registerFlight(KH, 'KH3333', date_f3)
+    await this.registerFlight(KH, 'KH4444', date_f4)
+
+    await this.registerOracles()
   },
 
   registerAirline: async function (_address, _title) {
@@ -60,7 +72,7 @@ const Backend = {
           })
           .then((result) => {
             this.airlines.push({ title: _title, address: _address })
-            console.log('\tAirline has been registered')
+            console.log('\tAirline has been registered: ' + _title)
           })
       })
       .catch((error) => {
@@ -68,59 +80,27 @@ const Backend = {
       })
   },
 
-  registerFlights: async function () {
-    let accounts = await web3.eth.getAccounts()
-    let wrightBrothers = accounts[1]
-    let kittyHawk = accounts[2]
+  registerFlight: async function (_airline, _code, _timestamp) {
+    let code_id = web3.utils.utf8ToHex(_code)
 
-    var flight_1 = web3.utils.utf8ToHex('WB1111')
-    var flight_2 = web3.utils.utf8ToHex('WB2222')
-    var flight_3 = web3.utils.utf8ToHex('KH3333')
-    var flight_4 = web3.utils.utf8ToHex('KH4444')
-    var timestamp = 1111
-
-    console.log('Registering Flights...')
-    await insuranceHandler.methods.registerFlight(flight_1, timestamp).send({
-      from: wrightBrothers,
-    })
-    this.flights.push({
-      key: flight_1,
-      code: 'WB1111',
-      airline: wrightBrothers,
-      timestamp: timestamp,
-    })
-
-    await insuranceHandler.methods.registerFlight(flight_2, timestamp).send({
-      from: wrightBrothers,
-    })
-    this.flights.push({
-      key: flight_2,
-      code: 'WB2222',
-      airline: wrightBrothers,
-      timestamp: timestamp,
-    })
-
-    await insuranceHandler.methods.registerFlight(flight_3, timestamp).send({
-      from: kittyHawk,
-    })
-    this.flights.push({
-      key: flight_3,
-      code: 'KH3333',
-      airline: kittyHawk,
-      timestamp: timestamp,
-    })
-
-    await insuranceHandler.methods.registerFlight(flight_4, timestamp).send({
-      from: kittyHawk,
-    })
-    this.flights.push({
-      key: flight_4,
-      code: 'KH4444',
-      airline: kittyHawk,
-      timestamp: timestamp,
-    })
-
-    console.log('All flights have been registered')
+    insuranceHandler.methods
+      .registerFlight(code_id, _timestamp)
+      .send({
+        from: _airline,
+        gas: 4000000,
+      })
+      .then((result) => {
+        this.flights.push({
+          code_id: code_id,
+          code: _code,
+          airline: _airline,
+          timestamp: _timestamp,
+        })
+        console.log('\tFlight has been registered:' + _code)
+      })
+      .catch((error) => {
+        console.log('\tError while registering flight: ' + error)
+      })
   },
 
   registerOracles: async function () {
