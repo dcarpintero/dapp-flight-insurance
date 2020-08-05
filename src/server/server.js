@@ -38,18 +38,22 @@ const Backend = {
     let WB = accounts[1]
     let KH = accounts[2]
 
-    let date_f1 = new Date('1 August 2022 08:45:00 GMT').getMilliseconds()
-    let date_f2 = new Date('1 August 2022 08:45:00 GMT').getMilliseconds()
-    let date_f3 = new Date('1 August 2022 08:45:00 GMT').getMilliseconds()
-    let date_f4 = new Date('1 August 2022 08:45:00 GMT').getMilliseconds()
+    let date_f1 = new Date('1 August 2022 11:11:00 GMT').getMilliseconds()
+    let date_f2 = new Date('2 August 2022 12:22:00 GMT').getMilliseconds()
+    let date_f3 = new Date('3 August 2022 13:33:00 GMT').getMilliseconds()
+    let date_f4 = new Date('4 August 2022 14:44:00 GMT').getMilliseconds()
 
-    await this.registerAirline(WB, 'Wright Brothers')
-    await this.registerAirline(KH, 'Kitty Hawk')
+    console.log('Initializing server...')
 
-    await this.registerFlight(WB, 'WB1111', date_f1)
-    await this.registerFlight(WB, 'WB2222', date_f2)
-    await this.registerFlight(KH, 'KH3333', date_f3)
-    await this.registerFlight(KH, 'KH4444', date_f4)
+    this.registerAirline(WB, 'Wright Brothers').then((result) => {
+      this.registerFlight(WB, 'WB1111', date_f1)
+      this.registerFlight(WB, 'WB2222', date_f2)
+    })
+
+    this.registerAirline(KH, 'Kitty Hawk').then((result) => {
+      this.registerFlight(KH, 'KH3333', date_f3)
+      this.registerFlight(KH, 'KH4444', date_f4)
+    })
 
     await this.registerOracles()
   },
@@ -59,25 +63,29 @@ const Backend = {
     let admin = accounts[0]
     let fee = await settings.methods.CONSORTIUM_MEMBERSHIP_FEE().call()
 
-    consortium.methods
-      .createAffiliate(_address, _title)
-      .send({ from: admin, gas: 4000000 })
-      .then((result) => {
-        consortium.methods
-          .depositMebership()
-          .send({
-            from: _address,
-            value: fee,
-            gas: 4000000,
-          })
-          .then((result) => {
-            this.airlines.push({ title: _title, address: _address })
-            console.log('\tAirline has been registered: ' + _title)
-          })
-      })
-      .catch((error) => {
-        console.log('\tError while registering airline: ' + error)
-      })
+    return new Promise((resolve, reject) => {
+      consortium.methods
+        .createAffiliate(_address, _title)
+        .send({ from: admin, gas: 4000000 })
+        .then((result) => {
+          consortium.methods
+            .depositMebership()
+            .send({
+              from: _address,
+              value: fee,
+              gas: 4000000,
+            })
+            .then((result) => {
+              this.airlines.push({ title: _title, address: _address })
+              console.log('Airline has been registered: ' + _title)
+              resolve()
+            })
+        })
+        .catch((error) => {
+          console.log('Error while registering airline: ' + error)
+          reject()
+        })
+    })
   },
 
   registerFlight: async function (_airline, _code, _timestamp) {
@@ -96,10 +104,10 @@ const Backend = {
           airline: _airline,
           timestamp: _timestamp,
         })
-        console.log('\tFlight has been registered:' + _code)
+        console.log('Flight has been registered: ' + _code)
       })
       .catch((error) => {
-        console.log('\tError while registering flight: ' + error)
+        console.log('Error while registering flight: ' + error)
       })
   },
 
