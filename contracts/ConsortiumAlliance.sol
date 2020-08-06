@@ -98,7 +98,7 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
         uint256 deposit;
         bool redeemed;
     }
-    mapping(bytes32 => Insurance) public insurances;
+    mapping(bytes32 => Insurance) private insurances;
 
     // ----------------- EVENTS -----------------
     event LogDelegateRegistered(address _address);
