@@ -223,4 +223,16 @@ app.get('/insuree/:address', async (req, res) => {
   })
 })
 
+app.get('/consortium', async (req, res) => {
+  var address = config.dataAddress
+  var balance = await consortium.methods.getConsortiumBalance().call()
+  var escrow = await consortium.methods.getConsortiumEscrow().call()
+
+  res.json({
+    address: address,
+    balance: balance,
+    escrow: escrow,
+  })
+})
+
 export default app
