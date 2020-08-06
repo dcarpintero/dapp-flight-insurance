@@ -38,10 +38,10 @@ const Backend = {
     let WB = accounts[1]
     let KH = accounts[2]
 
-    let date_f1 = new Date('1 August 2022 11:11:00 GMT').getMilliseconds()
-    let date_f2 = new Date('2 August 2022 12:22:00 GMT').getMilliseconds()
-    let date_f3 = new Date('3 August 2022 13:33:00 GMT').getMilliseconds()
-    let date_f4 = new Date('4 August 2022 14:44:00 GMT').getMilliseconds()
+    let date_f1 = new Date('1 August 2022 11:11:00 GMT').getTime()
+    let date_f2 = new Date('2 August 2022 12:22:00 GMT').getTime()
+    let date_f3 = new Date('3 August 2022 13:33:00 GMT').getTime()
+    let date_f4 = new Date('4 August 2022 14:44:00 GMT').getTime()
 
     console.log('Initializing server...')
 
@@ -89,18 +89,24 @@ const Backend = {
   },
 
   registerFlight: async function (_airline, _code, _timestamp) {
-    let code_id = web3.utils.utf8ToHex(_code)
+    let hexcode = web3.utils.utf8ToHex(_code)
+    let key = web3.utils.soliditySha3(
+      _airline,
+      hexcode.padEnd(2 + 64, '0'),
+      _timestamp,
+    )
 
     insuranceHandler.methods
-      .registerFlight(code_id, _timestamp)
+      .registerFlight(hexcode, _timestamp)
       .send({
         from: _airline,
         gas: 4000000,
       })
       .then((result) => {
         this.flights.push({
-          code_id: code_id,
+          key: key,
           code: _code,
+          hexcode: hexcode,
           airline: _airline,
           timestamp: _timestamp,
         })
@@ -163,25 +169,13 @@ Backend.init()
 const app = express()
 
 app.get('/api', (req, res) => {
-  res.send({
+  res.json({
     version: '0.1.0',
   })
 })
 
 app.get('/airlines', (req, res) => {
-  res.send(Backend.airlines)
-})
-
-app.get('/flights', (req, res) => {
-  res.send(Backend.flights)
-})
-
-app.get('/oracles', (req, res) => {
-  res.send(Backend.oracles)
-})
-
-app.get('/insuree/:address', (req, res) => {
-  res.send('insuree, balance, credit')
+  res.json(Backend.airlines)
 })
 
 app.get('/airline/:address', async (req, res) => {
@@ -191,9 +185,33 @@ app.get('/airline/:address', async (req, res) => {
     if (err) {
       console.log(err.message)
     } else {
-      res.send(result)
+      res.json(result)
     }
   })
+})
+
+app.get('/flights', (req, res) => {
+  res.json(Backend.flights)
+})
+
+app.get('/flight/:key', (req, res) => {
+  var key = req.params.key
+
+  insuranceHandler.methods.flights(key).call(function (err, result) {
+    if (err) {
+      console.log(err.message)
+    } else {
+      res.json(result)
+    }
+  })
+})
+
+app.get('/oracles', (req, res) => {
+  res.json(Backend.oracles)
+})
+
+app.get('/insuree/:address', (req, res) => {
+  res.json('insuree address, balance, escrow_credit')
 })
 
 export default app
