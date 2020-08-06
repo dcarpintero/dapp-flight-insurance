@@ -178,7 +178,7 @@ app.get('/airlines', (req, res) => {
   res.json(Backend.airlines)
 })
 
-app.get('/airline/:address', async (req, res) => {
+app.get('/airline/:address', (req, res) => {
   var address = req.params.address
 
   consortium.methods.affiliates(address).call(function (err, result) {
@@ -210,8 +210,17 @@ app.get('/oracles', (req, res) => {
   res.json(Backend.oracles)
 })
 
-app.get('/insuree/:address', (req, res) => {
-  res.json('insuree address, balance, escrow_credit')
+app.get('/insuree/:address', async (req, res) => {
+  var insuree = req.params.address
+  var balance = await web3.eth.getBalance(insuree)
+
+  await consortium.methods.payments(insuree).call(function (err, payments) {
+    if (err) {
+      console.log(err.message)
+    } else {
+      res.json({ address: insuree, balance: balance, premium: payments })
+    }
+  })
 })
 
 export default app
