@@ -90,7 +90,7 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
         uint256 approvals;
         mapping(address => bool) votes;
     }
-    mapping(address => Affiliate) private affiliates;
+    mapping(address => Affiliate) public affiliates;
 
     // ----------------- INSURANCES -----------------
     struct Insurance {
@@ -98,7 +98,7 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
         uint256 deposit;
         bool redeemed;
     }
-    mapping(bytes32 => Insurance) insurances;
+    mapping(bytes32 => Insurance) public insurances;
 
     // ----------------- EVENTS -----------------
     event LogDelegateRegistered(address _address);
