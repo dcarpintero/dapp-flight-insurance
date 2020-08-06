@@ -50,7 +50,7 @@ contract FlightInsuranceHandler is Ownable, AccessControl, PullPayment {
         uint256 updatedTimestamp;
         address airline;
     }
-    mapping(bytes32 => Flight) private flights;
+    mapping(bytes32 => Flight) public flights;
     bytes32[] private flightKeys;
 
     // ----------------- FLIGHT INSURANCE -----------------
@@ -61,7 +61,7 @@ contract FlightInsuranceHandler is Ownable, AccessControl, PullPayment {
         bool isRegistered;
         uint8[3] indexes;
     }
-    mapping(address => Oracle) private oracles;
+    mapping(address => Oracle) public oracles;
 
     struct ResponseInfo {
         address requester;
@@ -303,6 +303,10 @@ contract FlightInsuranceHandler is Ownable, AccessControl, PullPayment {
 
     function getMyIndexes() external view onlyOracle returns (uint8[3] memory) {
         return oracles[msg.sender].indexes;
+    }
+
+    function getText() external pure returns (string memory) {
+        return "hello world";
     }
 
     /**
