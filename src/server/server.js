@@ -32,6 +32,7 @@ const Backend = {
   airlines: [],
   flights: [],
   oracles: [],
+  insurances: [],
 
   init: async function () {
     let accounts = await web3.eth.getAccounts()
@@ -43,8 +44,8 @@ const Backend = {
     let date_f3 = new Date('3 August 2022 13:33:00 GMT').getTime()
     let date_f4 = new Date('4 August 2022 14:44:00 GMT').getTime()
 
-    console.log('Initializing server...')
-
+    console.log('Initializing airlines, flights and oracles...')
+    /*
     this.registerAirline(WB, 'Wright Brothers').then((result) => {
       this.registerFlight(WB, 'WB1111', date_f1)
       this.registerFlight(WB, 'WB2222', date_f2)
@@ -54,8 +55,9 @@ const Backend = {
       this.registerFlight(KH, 'KH3333', date_f3)
       this.registerFlight(KH, 'KH4444', date_f4)
     })
-
-    await this.registerOracles()
+*/
+    /*
+    await this.registerOracles() */
   },
 
   registerAirline: async function (_address, _title) {
@@ -117,6 +119,25 @@ const Backend = {
       })
   },
 
+  registerInsurance: async function (passenger, flight, fee) {
+    if (web3.utils.isAddress(passenger)) {
+      insuranceHandler.methods
+        .registerFlightInsurance(flight)
+        .send({ from: passenger, value: fee, gas: 4000000 })
+        .then((result) => {
+          this.insurances.push({
+            passenger: passenger,
+            flight: flight,
+            fee: fee,
+          })
+          console.log('Flight Insurance has been registered')
+        })
+        .catch((error) => {
+          console.log('Error while registering flight insurance: ' + error)
+        })
+    }
+  },
+
   registerOracles: async function () {
     let accounts = await web3.eth.getAccounts()
     const ORACLES_COUNT = 25
@@ -167,8 +188,9 @@ flightSuretyApp.events.OracleRequest(
 Backend.init()
 
 const app = express()
+app.use(express.json())
 
-app.get('/api', (req, res) => {
+app.get('/', (req, res) => {
   res.json({
     version: '0.1.0',
   })
@@ -221,6 +243,19 @@ app.get('/insuree/:address', async (req, res) => {
       res.json({ address: insuree, balance: balance, premium: payments })
     }
   })
+})
+
+app.post('/insurance', async (req, res) => {
+  var passenger = req.body.passenger
+  var flight = req.body.flight
+  var fee = req.body.fee
+
+  await Backend.registerInsurance(passenger, flight, fee)
+  res.json(req.body)
+})
+
+app.get('/insurances', async (req, res) => {
+  res.json(Backend.insurances)
 })
 
 app.get('/consortium', async (req, res) => {
