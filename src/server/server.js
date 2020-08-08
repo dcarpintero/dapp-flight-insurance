@@ -57,8 +57,7 @@ const Backend = {
       this.registerFlight(KH, 'KH4444', date_f4)
     })*/
 
-    /*
-    await this.registerOracles() */
+    await this.registerOracles()
   },
 
   registerAirline: async function (_address, _title) {
@@ -177,10 +176,6 @@ const Backend = {
   requestFlightStatus: async function (airline, flight, timestamp) {
     let accounts = await web3.eth.getAccounts()
 
-    airline = '0x2f34CAbf168F4EA9215DeC72330a87aB60af2eD2'
-    flight = '0x574231313131'
-    timestamp = 1659352260000
-
     insuranceHandler.methods
       .requestFlightStatus(airline, flight, timestamp)
       .send({ from: accounts[0] })
@@ -189,17 +184,44 @@ const Backend = {
       })
   },
 
-  sendOracleResponse: async function () {
-    insuranceHandler.methods
-      .submitOracleResponse(oracleIndexes[idx], airline, flight, timestamp, 4)
-      .call({
-        from: accounts[i],
-      })
-      .then((result) => {
-        console.log('Oracle response has been registered:' + accounts[i])
-      })
+  sendOracleResponse: async function (key, index, airline, flight, timestamp) {
+    let totalResponses = 0
+    const consensus = await settings.methods.ORACLE_CONSENSUS_RESPONSES().call()
+
+    for (let i = 0; i < this.oracles.length; i++) {
+      for (let idx = 0; idx < 3; idx++) {
+        if (index == this.oracles[i].indexes[idx]) {
+          console.log(
+            '\t submitting oracle response: ' + this.oracles[i].indexes[idx],
+          )
+
+          // 4 is a LATE_AIRLINE status code
+          await insuranceHandler.methods
+            .submitOracleResponse(
+              this.oracles[i].indexes[idx],
+              airline,
+              flight,
+              timestamp,
+              4,
+            )
+            .send({
+              from: this.oracles[i].address,
+            })
+
+          totalResponses = totalResponses + 1
+
+          if (totalResponses == consensus) {
+            console.log('\t reached Oracle consensus')
+            return
+          }
+        }
+      }
+    }
   },
 }
+
+// TO-DO: consortium credited event
+// TO-DO: insuree credited event
 
 insuranceHandler.events.LogFlightStatusRequested(
   { fromBlock: 0 },
@@ -207,8 +229,13 @@ insuranceHandler.events.LogFlightStatusRequested(
     if (error) {
       console.log('error:' + error)
     } else {
-      console.log('LogFlightStatusRequested event received')
-      //console.log(event)
+      var key = event.returnValues.key
+      var index = event.returnValues.index
+      var airline = event.returnValues.airline
+      var flight = event.returnValues.flight
+      var timestamp = event.returnValues.timestamp
+
+      Backend.sendOracleResponse(key, index, airline, flight, timestamp)
     }
   },
 )
