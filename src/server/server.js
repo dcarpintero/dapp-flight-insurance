@@ -45,6 +45,7 @@ const Backend = {
     let date_f4 = new Date('4 August 2022 14:44:00 GMT').getTime()
 
     console.log('Initializing airlines, flights and oracles...')
+
     /*
     this.registerAirline(WB, 'Wright Brothers').then((result) => {
       this.registerFlight(WB, 'WB1111', date_f1)
@@ -54,8 +55,8 @@ const Backend = {
     this.registerAirline(KH, 'Kitty Hawk').then((result) => {
       this.registerFlight(KH, 'KH3333', date_f3)
       this.registerFlight(KH, 'KH4444', date_f4)
-    })
-*/
+    })*/
+
     /*
     await this.registerOracles() */
   },
@@ -172,18 +173,45 @@ const Backend = {
         }
       })
   },
+
+  requestFlightStatus: async function (airline, flight, timestamp) {
+    let accounts = await web3.eth.getAccounts()
+
+    airline = '0x2f34CAbf168F4EA9215DeC72330a87aB60af2eD2'
+    flight = '0x574231313131'
+    timestamp = 1659352260000
+
+    insuranceHandler.methods
+      .requestFlightStatus(airline, flight, timestamp)
+      .send({ from: accounts[0] })
+      .then((result) => {
+        console.log('Flight status has been requested:' + flight)
+      })
+  },
+
+  sendOracleResponse: async function () {
+    insuranceHandler.methods
+      .submitOracleResponse(oracleIndexes[idx], airline, flight, timestamp, 4)
+      .call({
+        from: accounts[i],
+      })
+      .then((result) => {
+        console.log('Oracle response has been registered:' + accounts[i])
+      })
+  },
 }
 
-/*
-flightSuretyApp.events.OracleRequest(
-  {
-    fromBlock: 0,
+insuranceHandler.events.LogFlightStatusRequested(
+  { fromBlock: 0 },
+  (error, event) => {
+    if (error) {
+      console.log('error:' + error)
+    } else {
+      console.log('LogFlightStatusRequested event received')
+      //console.log(event)
+    }
   },
-  function (error, event) {
-    if (error) console.log(error);
-    console.log(event);
-  }
-);*/
+)
 
 Backend.init()
 
@@ -228,8 +256,21 @@ app.get('/flight/:key', (req, res) => {
   })
 })
 
+app.get('/flight/:key/status', (req, res) => {
+  var airline = req.body.airline
+  var flight = req.body.hexcode
+  var timestamp = req.body.timestamp
+
+  Backend.requestFlightStatus(airline, flight, timestamp)
+  res.sendStatus(200)
+})
+
 app.get('/oracles', (req, res) => {
   res.json(Backend.oracles)
+})
+
+app.get('/insurances', async (req, res) => {
+  res.json(Backend.insurances)
 })
 
 app.get('/insuree/:address', async (req, res) => {
@@ -252,10 +293,6 @@ app.post('/insurance', async (req, res) => {
 
   await Backend.registerInsurance(passenger, flight, fee)
   res.json(req.body)
-})
-
-app.get('/insurances', async (req, res) => {
-  res.json(Backend.insurances)
 })
 
 app.get('/consortium', async (req, res) => {
