@@ -38,15 +38,16 @@ const Backend = {
     let accounts = await web3.eth.getAccounts()
     let WB = accounts[1]
     let KH = accounts[2]
+    let DC = accounts[3]
 
     let date_f1 = new Date('1 August 2022 11:11:00 GMT').getTime()
     let date_f2 = new Date('2 August 2022 12:22:00 GMT').getTime()
     let date_f3 = new Date('3 August 2022 13:33:00 GMT').getTime()
     let date_f4 = new Date('4 August 2022 14:44:00 GMT').getTime()
+    let date_f5 = new Date('5 August 2022 15:55:00 GMT').getTime()
 
     console.log('Initializing airlines, flights and oracles...')
 
-    /*
     this.registerAirline(WB, 'Wright Brothers').then((result) => {
       this.registerFlight(WB, 'WB1111', date_f1)
       this.registerFlight(WB, 'WB2222', date_f2)
@@ -55,6 +56,11 @@ const Backend = {
     this.registerAirline(KH, 'Kitty Hawk').then((result) => {
       this.registerFlight(KH, 'KH3333', date_f3)
       this.registerFlight(KH, 'KH4444', date_f4)
+    })
+
+    /*
+    this.registerAirline(DC, 'De la Cierva').then((result) => {
+      this.registerFlight(DC, 'DC5555', date_f5)
     })*/
 
     await this.registerOracles()
@@ -79,12 +85,12 @@ const Backend = {
             })
             .then((result) => {
               this.airlines.push({ title: _title, address: _address })
-              console.log('Airline has been registered: ' + _title)
+              console.log('\tAirline has been registered: ' + _title)
               resolve()
             })
         })
         .catch((error) => {
-          console.log('Error while registering airline: ' + error)
+          console.log('\tError while registering airline: ' + error)
           reject()
         })
     })
@@ -112,10 +118,10 @@ const Backend = {
           airline: _airline,
           timestamp: _timestamp,
         })
-        console.log('Flight has been registered: ' + _code)
+        console.log('\tFlight has been registered: ' + _code)
       })
       .catch((error) => {
-        console.log('Error while registering flight: ' + error)
+        console.log('\tError while registering flight: ' + error)
       })
   },
 
@@ -130,10 +136,10 @@ const Backend = {
             flight: flight,
             fee: fee,
           })
-          console.log('Flight Insurance has been registered')
+          console.log('\tFlight Insurance has been registered')
         })
         .catch((error) => {
-          console.log('Error while registering flight insurance: ' + error)
+          console.log('\tError while registering flight insurance: ' + error)
         })
     }
   },
@@ -146,7 +152,7 @@ const Backend = {
       .ORACLE_MEMBERSHIP_FEE()
       .call()
       .then((fee) => {
-        for (let a = 10; a < ORACLES_COUNT; a++) {
+        for (let a = 10; a < ORACLES_COUNT + 10; a++) {
           insuranceHandler.methods
             .registerOracle()
             .send({ from: accounts[a], value: fee, gas: 4000000 })
@@ -157,13 +163,16 @@ const Backend = {
                 .then((indexes) => {
                   this.oracles.push({ address: accounts[a], indexes: indexes })
                   console.log(
-                    'Oracle registered: ' + accounts[a] + ' indexes:' + indexes,
+                    '\tOracle registered: ' +
+                      accounts[a] +
+                      ' indexes:' +
+                      indexes,
                   )
                 })
             })
             .catch((error) => {
               console.log(
-                'Error while registering oracles: ' +
+                '\tError while registering oracles: ' +
                   accounts[a] +
                   ' Error: ' +
                   error,
@@ -192,26 +201,32 @@ const Backend = {
       for (let idx = 0; idx < 3; idx++) {
         if (index == this.oracles[i].indexes[idx]) {
           console.log(
-            '\t submitting oracle response: ' + this.oracles[i].indexes[idx],
+            '\t submitting response:%i from oracle %s',
+            this.oracles[i].indexes[idx],
+            this.oracles[i].address,
           )
 
           // 4 is a LATE_AIRLINE status code
-          await insuranceHandler.methods
-            .submitOracleResponse(
-              this.oracles[i].indexes[idx],
-              airline,
-              flight,
-              timestamp,
-              4,
-            )
-            .send({
-              from: this.oracles[i].address,
-            })
+          try {
+            await insuranceHandler.methods
+              .submitOracleResponse(
+                this.oracles[i].indexes[idx],
+                airline,
+                flight,
+                timestamp,
+                4,
+              )
+              .send({
+                from: this.oracles[i].address,
+                gas: 4000000,
+              })
+          } catch (error) {
+            console.log(error.message)
+          }
 
           totalResponses = totalResponses + 1
 
           if (totalResponses == consensus) {
-            console.log('\t reached Oracle consensus')
             return
           }
         }
@@ -225,7 +240,7 @@ insuranceHandler.events.LogInsureeCredited({ fromBlock: 0 }, (error, event) => {
     console.log('error:' + error)
   } else {
     console.log(
-      'Insurance %s has been credited to insuree',
+      '\tInsurance %s has been credited to insuree',
       event.returnValues.key,
     )
   }
@@ -238,12 +253,34 @@ insuranceHandler.events.LogConsortiumCredited(
       console.log('error:' + error)
     } else {
       console.log(
-        'Insurance %s has been credited to consortium',
+        '\tInsurance %s has been credited to consortium',
         event.returnValues.key,
       )
     }
   },
 )
+
+insuranceHandler.events.LogOracleReport({ fromBlock: 0 }, (error, event) => {
+  if (error) {
+    console.log('error:' + error)
+  } else {
+    console.log(
+      '\tOracle %s response has been registered',
+      event.returnValues.oracle,
+    )
+  }
+})
+
+insuranceHandler.events.LogFlightStatus({ fromBlock: 0 }, (error, event) => {
+  if (error) {
+    console.log('error:' + error)
+  } else {
+    console.log(
+      '\tConsensus has been reached for flight status:' +
+        event.returnValues.status,
+    )
+  }
+})
 
 insuranceHandler.events.LogFlightStatusRequested(
   { fromBlock: 0 },
@@ -316,6 +353,20 @@ app.get('/flight/:key/status', (req, res) => {
 
 app.get('/oracles', (req, res) => {
   res.json(Backend.oracles)
+})
+
+app.get('/oracle/:address', async (req, res) => {
+  var oracle = req.params.address
+
+  await insuranceHandler.methods
+    .getMyIndexes()
+    .call({ from: oracle }, function (err, indexes) {
+      if (err) {
+        console.log(err.message)
+      } else {
+        res.json(indexes)
+      }
+    })
 })
 
 app.get('/insurances', async (req, res) => {
