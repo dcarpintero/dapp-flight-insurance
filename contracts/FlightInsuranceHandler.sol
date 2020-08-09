@@ -191,14 +191,6 @@ contract FlightInsuranceHandler is Ownable, AccessControl, PullPayment {
         _;
     }
 
-    modifier onlyValidResponse(bytes32 requestKey) {
-        require(
-            oracleResponses[requestKey].isOpen,
-            "This flight status request has been resolved already"
-        );
-        _;
-    }
-
     modifier onlyOpenResponse(
         uint8 index,
         address airline,
@@ -386,16 +378,17 @@ contract FlightInsuranceHandler is Ownable, AccessControl, PullPayment {
         bytes32 flight,
         uint256 timestamp,
         uint8 statusCode
-    )
-        internal
-        onlyValidResponse(responseKey)
-        onlyValidFlight(airline, flight, timestamp)
-    {
+    ) internal onlyValidFlight(airline, flight, timestamp) {
         FlightStatus status = FlightStatus(statusCode);
 
         require(
             status != FlightStatus.UNKNOWN,
             "Unknown FlightStatus cannot be processed"
+        );
+
+        require(
+            oracleResponses[responseKey].isOpen,
+            "This flight status request has been resolved already"
         );
 
         bytes32 flightKey = _getFlightKey(airline, flight, timestamp);
