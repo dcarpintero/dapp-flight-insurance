@@ -58,10 +58,9 @@ const Backend = {
       this.registerFlight(KH, 'KH4444', date_f4)
     })
 
-    /*
     this.registerAirline(DC, 'De la Cierva').then((result) => {
       this.registerFlight(DC, 'DC5555', date_f5)
-    })*/
+    })
 
     await this.registerOracles()
   },
