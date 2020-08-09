@@ -9,6 +9,9 @@ module.exports = function (deployer) {
     await deployer.deploy(ConsortiumAlliance, ConsortiumSettings.address)
     await deployer.deploy(FlightInsuranceHandler, ConsortiumAlliance.address)
 
+    consortium = await ConsortiumAlliance.deployed()
+    await consortium.addDelegateRole(FlightInsuranceHandler.address)
+
     let config = {
       localhost: {
         url: 'http://localhost:8545',
