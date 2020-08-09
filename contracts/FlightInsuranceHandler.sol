@@ -103,6 +103,7 @@ contract FlightInsuranceHandler is Ownable, AccessControl, PullPayment {
     );
 
     event LogOracleReport(
+        address oracle,
         address airline,
         bytes32 flight,
         uint256 timestamp,
@@ -331,16 +332,13 @@ contract FlightInsuranceHandler is Ownable, AccessControl, PullPayment {
         address airline,
         bytes32 flight,
         uint256 timestamp,
-        uint8 statusCode
-    )
-        external
-        onlyTrustedOracle(index)
-        onlyOpenResponse(index, airline, flight, timestamp)
-    {
+        uint8 statusCode //onlyTrustedOracle(index) //onlyOpenResponse(index, airline, flight, timestamp)
+    ) external {
         bytes32 key = _getResponseKey(index, airline, flight, timestamp);
 
         oracleResponses[key].responses[statusCode].push(msg.sender);
         emit LogOracleReport(
+            msg.sender,
             airline,
             flight,
             timestamp,
