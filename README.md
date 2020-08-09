@@ -8,7 +8,7 @@ Decentralized application aimed at providing passengers' insurance. A consortium
 
 - Access Control to voting rights, agreement on flight status and management of funds is implemented via consensus and trusted roles (affiliate, oracle and delegate roles).
 - Stop-Loss is automatic once a drain of funds is detected, or upon consensus in form of operational status.
-- Reentrancy checks in credit insurance functions.
+- Reentrancy checks are implemented in credit insurance functions.
 - Escrow accounts and pull payments: the paying contract does not interact directly with the insuree account, which must withdraw the premium payments itself. Insurees can query their due premiums with a payments function, and retrieve them with a withdrawPayments function (see https://docs.openzeppelin.com/contracts/3.x/api/payment#PullPayment and https://consensys.github.io/smart-contract-best-practices/recommendations/#favor-pull-over-push-for-external-calls).
 
 ### Design and Upgradability
@@ -18,6 +18,8 @@ Decentralized application aimed at providing passengers' insurance. A consortium
 - ConsortiumSettings defines the project roles, consensus criteria and administrative fees of the project.
 
 - FlightInsuranceHandler is concerned with the specific business logic of airlines', flights' and insurances registration. As a trusted delegate of the ConsortiumAlliance, it triggers the credit of insurance deposits and premiums upon Oracle consensus on flight status.
+
+- A Express.js server application provides a REST API to interact with the contracts and register airlines, flights, oracles and insurances.
 
 ### Unit and system tests
 
