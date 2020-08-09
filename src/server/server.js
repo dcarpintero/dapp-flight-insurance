@@ -220,8 +220,30 @@ const Backend = {
   },
 }
 
-// TO-DO: consortium credited event
-// TO-DO: insuree credited event
+insuranceHandler.events.LogInsureeCredited({ fromBlock: 0 }, (error, event) => {
+  if (error) {
+    console.log('error:' + error)
+  } else {
+    console.log(
+      'Insurance %s has been credited to insuree',
+      event.returnValues.key,
+    )
+  }
+})
+
+insuranceHandler.events.LogConsortiumCredited(
+  { fromBlock: 0 },
+  (error, event) => {
+    if (error) {
+      console.log('error:' + error)
+    } else {
+      console.log(
+        'Insurance %s has been credited to consortium',
+        event.returnValues.key,
+      )
+    }
+  },
+)
 
 insuranceHandler.events.LogFlightStatusRequested(
   { fromBlock: 0 },
