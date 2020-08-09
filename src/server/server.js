@@ -200,13 +200,7 @@ const Backend = {
     for (let i = 0; i < this.oracles.length; i++) {
       for (let idx = 0; idx < 3; idx++) {
         if (index == this.oracles[i].indexes[idx]) {
-          console.log(
-            '\t submitting response:%i from oracle %s',
-            this.oracles[i].indexes[idx],
-            this.oracles[i].address,
-          )
-
-          // 4 is a LATE_AIRLINE status code
+          // 2 is a LATE_AIRLINE status code
           try {
             await insuranceHandler.methods
               .submitOracleResponse(
@@ -214,7 +208,7 @@ const Backend = {
                 airline,
                 flight,
                 timestamp,
-                4,
+                2,
               )
               .send({
                 from: this.oracles[i].address,
@@ -265,8 +259,9 @@ insuranceHandler.events.LogOracleReport({ fromBlock: 0 }, (error, event) => {
     console.log('error:' + error)
   } else {
     console.log(
-      '\tOracle %s response has been registered',
+      '\tOracle %s response: %s has been registered',
       event.returnValues.oracle,
+      event.returnValues.status,
     )
   }
 })
@@ -276,7 +271,7 @@ insuranceHandler.events.LogFlightStatus({ fromBlock: 0 }, (error, event) => {
     console.log('error:' + error)
   } else {
     console.log(
-      '\tConsensus has been reached for flight status:' +
+      '\tConsensus has been reached for flight status: ' +
         event.returnValues.status,
     )
   }
