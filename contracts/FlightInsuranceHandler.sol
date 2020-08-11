@@ -2,7 +2,6 @@
 
 pragma solidity 0.6.2;
 
-import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/payment/PullPayment.sol";
@@ -11,30 +10,28 @@ import "./ConsortiumAlliance.sol";
 
 /**
  * @title FlightInsuranceHandler
- * @dev Provides specific business logic of airlines', flights' and insurances registration.
+ * @dev Provides specific business logic for airlines', flights' and insurances registration.
  *
  *      - As a delegate of ConsortiumAlliance, airlines are registered
  *        as affiliates, passengers as insurees and flight insurances as
  *        insurance deposits.
  *
- *      - Trusted Oracles match the request index code, and  agree on flight status
+ *      - Trusted Oracles match the request index code, and agree on flight status
  *        to resolve insurances.
  *
- *      - Unreedemable insurances are credited to the shared  consortium account,
- *        whereas insurances for flights resolved with  LATE_AIRLINE status code
- *        result in a escrow account credited with the premium.
+ *      - Unreedemable insurances are credited to the shared consortium account,
+ *        whereas insurances for flights resolved with LATE_AIRLINE status code
+ *        result in a escrow account being credited with the premium.
  *
  *      - Insurees shall withdraw the funds from said escrow account.
  *
  *      - see also ConsortiumAlliance contract.
  */
 contract FlightInsuranceHandler is Ownable, AccessControl, PullPayment {
-    using SafeMath for uint256;
-
     ConsortiumAlliance private consortium;
     uint8 private nonce = 0;
 
-    // ----------------- FLIGHT -----------------
+    // --------------- FLIGHT -------------------------------------------------
     enum FlightStatus {
         UNKNOWN,
         ON_TIME,
@@ -46,17 +43,17 @@ contract FlightInsuranceHandler is Ownable, AccessControl, PullPayment {
 
     struct Flight {
         bool isRegistered;
-        FlightStatus status;
-        uint256 updatedTimestamp;
         address airline;
+        uint256 updatedTimestamp;
+        FlightStatus status;
     }
     mapping(bytes32 => Flight) public flights;
     bytes32[] private flightKeys;
 
-    // ----------------- FLIGHT INSURANCE -----------------
+    // --------------- FLIGHT INSURANCE ---------------------------------------
     mapping(bytes32 => bytes32[]) private flightInsurances;
 
-    // ----------------- ORACLES  -----------------
+    // --------------- ORACLES ------------------------------------------------
     struct Oracle {
         bool isRegistered;
         uint8[3] indexes;
@@ -65,63 +62,44 @@ contract FlightInsuranceHandler is Ownable, AccessControl, PullPayment {
 
     struct ResponseInfo {
         address requester;
-        bool isOpen; // if open, oracle responses are accepted
+        bool isOpen;
         mapping(uint8 => address[]) responses; // status => oracles
     }
-    mapping(bytes32 => ResponseInfo) private oracleResponses; // Key = hash(index, flight, timestamp)
+    mapping(bytes32 => ResponseInfo) private oracleResponses; // Key = hash(index, flightKey)
 
-    // ----------------- EVENTS -----------------
+    // --------------- EVENTS -------------------------------------------------
+    event LogAdminRegistered(address admin);
     event LogDelegateRegistered(address _address);
 
     event LogAirlineRegistered(address indexed airline, string title);
     event LogOracleRegistered(address oracle);
+
     event LogFlightRegistered(
-        address indexed airline,
         bytes32 key,
-        bytes32 flight,
+        address indexed airline,
+        bytes32 hexcode,
         uint256 timestamp
     );
     event LogFlightInsuranceRegistered(
-        bytes32 key,
+        bytes32 insurance,
         bytes32 flight,
         address indexed insuree
     );
 
     event LogFlightStatusRequested(
-        bytes32 key,
-        uint8 index,
-        address indexed airline,
         bytes32 flight,
-        uint256 timestamp
+        bytes32 response,
+        uint8 index
     );
 
-    event LogFlightStatus(
-        address airline,
-        bytes32 flight,
-        uint256 timestamp,
-        FlightStatus status
-    );
-
-    event LogOracleReport(
-        address oracle,
-        address airline,
-        bytes32 flight,
-        uint256 timestamp,
-        FlightStatus status
-    );
-
-    event LogFlightStatusProcessed(
-        bytes32 key,
-        address indexed airline,
-        bytes32 flight
-    );
+    event LogFlightStatusResolved(bytes32 flight, FlightStatus status);
+    event LogOracleReport(address oracle, bytes32 flight, FlightStatus status);
+    event LogFlightStatusProcessed(bytes32 flight);
 
     event LogInsureeCredited(bytes32 flight, bytes32 key);
     event LogConsortiumCredited(bytes32 flight, bytes32 key);
 
-    // ----------------- MODIFIERS -----------------
-    event LogAdminRegistered(address admin);
-
+    // --------------- MODIFIERS ----------------------------------------------
     modifier onlyOperational() {
         require(isOperational(), "Contract is currently not operational");
         _;
@@ -182,23 +160,13 @@ contract FlightInsuranceHandler is Ownable, AccessControl, PullPayment {
         _;
     }
 
-    modifier onlyValidFlight(
-        address airline,
-        bytes32 flight,
-        uint256 timestamp
-    ) {
-        bytes32 key = _getFlightKey(airline, flight, timestamp);
+    modifier onlyValidFlight(bytes32 key) {
         require(flights[key].isRegistered, "Invalid flight");
         _;
     }
 
-    modifier onlyOpenResponse(
-        uint8 index,
-        address airline,
-        bytes32 flight,
-        uint256 timestamp
-    ) {
-        bytes32 key = _getResponseKey(index, airline, flight, timestamp);
+    modifier onlyOpenResponse(uint8 index, bytes32 flightKey) {
+        bytes32 key = _getResponseKey(index, flightKey);
         require(
             oracleResponses[key].isOpen,
             "Flight or timestamp do not match oracle request"
@@ -206,23 +174,13 @@ contract FlightInsuranceHandler is Ownable, AccessControl, PullPayment {
         _;
     }
 
-    // ----------------- CONSTRUCTOR -----------------
-
+    /**
+     * @dev Constructor.
+     */
     constructor(address _consortiumAlliance) public {
         consortium = ConsortiumAlliance(_consortiumAlliance);
         _setupRole(consortium.settings().ADMIN_ROLE(), msg.sender);
         emit LogAdminRegistered(msg.sender);
-    }
-
-    function addDelegateRole(address _address)
-        external
-        onlyAdmin
-        onlyOperational
-    {
-        require(_address != address(0), "Delegate cannot be the zero address");
-
-        _setupRole(consortium.settings().DELEGATE_ROLE(), _address);
-        emit LogDelegateRegistered(_address);
     }
 
     function isOperational() public view returns (bool) {
@@ -241,44 +199,46 @@ contract FlightInsuranceHandler is Ownable, AccessControl, PullPayment {
     /**
      * @dev Register a future flight for insuring.
      */
-    function registerFlight(bytes32 flight, uint256 timestamp)
+    function registerFlight(bytes32 hexcode, uint256 timestamp)
         external
         onlyOperational
         onlyConsortiumAirline
         returns (bytes32)
     {
-        bytes32 key = _getFlightKey(msg.sender, flight, timestamp);
+        address airline = msg.sender;
+        bytes32 key = _getFlightKey(airline, hexcode, timestamp);
 
         flights[key] = Flight({
             isRegistered: true,
-            airline: msg.sender,
+            airline: airline,
             status: FlightStatus.UNKNOWN,
             updatedTimestamp: timestamp
         });
+
         flightKeys.push(key);
 
-        emit LogFlightRegistered(msg.sender, key, flight, timestamp);
+        emit LogFlightRegistered(key, airline, hexcode, timestamp);
         return key;
     }
 
     /**
      * @dev Register a new flight insurance.
      */
-    function registerFlightInsurance(bytes32 _flightKey)
+    function registerFlightInsurance(bytes32 flightKey)
         external
         payable
-        onlyValidFlightKey(_flightKey)
+        onlyValidFlightKey(flightKey)
         onlyOperational
         returns (bytes32)
     {
-        bytes32 insurance = consortium.depositInsurance.value(msg.value)(
+        bytes32 insuranceKey = consortium.depositInsurance.value(msg.value)(
             msg.sender
         );
 
-        flightInsurances[_flightKey].push(insurance);
+        flightInsurances[flightKey].push(insuranceKey);
 
-        emit LogFlightInsuranceRegistered(insurance, _flightKey, msg.sender);
-        return insurance;
+        emit LogFlightInsuranceRegistered(insuranceKey, flightKey, msg.sender);
+        return insuranceKey;
     }
 
     /**
@@ -298,89 +258,56 @@ contract FlightInsuranceHandler is Ownable, AccessControl, PullPayment {
         return oracles[msg.sender].indexes;
     }
 
-    function getText() external pure returns (string memory) {
-        return "hello world";
-    }
-
     /**
-     * @dev Generates a request for oracles to request flight information
+     * @dev Requests flight information to Oracles.
      */
-    function requestFlightStatus(
-        address airline,
-        bytes32 flight,
-        uint256 timestamp
-    ) external onlyOperational {
+    function requestFlightStatus(bytes32 flightKey) external onlyOperational {
         uint8 index = _getRandomIndex(msg.sender);
-        bytes32 key = _getResponseKey(index, airline, flight, timestamp);
+        bytes32 responseKey = _getResponseKey(index, flightKey);
 
-        oracleResponses[key] = ResponseInfo({
+        oracleResponses[responseKey] = ResponseInfo({
             requester: msg.sender,
             isOpen: true
         });
 
-        emit LogFlightStatusRequested(key, index, airline, flight, timestamp);
+        emit LogFlightStatusRequested(flightKey, responseKey, index);
     }
 
     /**
-     * @dev Called by oracles when a response is available to an outstanding request
+     * @dev Called by Oracles when a response is available to an outstanding request
      *      For the response to be accepted, there must be a pending request that is open
      *      and matches one of the three Indexes randomly assigned to the oracle at the
      *      time of registration (i.e. only trusted oracles).
      */
     function submitOracleResponse(
         uint8 index,
-        address airline,
-        bytes32 flight,
-        uint256 timestamp,
+        bytes32 flightKey,
         uint8 statusCode
-    )
-        external
-        onlyTrustedOracle(index)
-        onlyOpenResponse(index, airline, flight, timestamp)
-    {
-        bytes32 key = _getResponseKey(index, airline, flight, timestamp);
+    ) external onlyTrustedOracle(index) onlyOpenResponse(index, flightKey) {
+        bytes32 responseKey = _getResponseKey(index, flightKey);
 
-        oracleResponses[key].responses[statusCode].push(msg.sender);
-        emit LogOracleReport(
-            msg.sender,
-            airline,
-            flight,
-            timestamp,
-            FlightStatus(statusCode)
-        );
+        oracleResponses[responseKey].responses[statusCode].push(msg.sender);
+
+        emit LogOracleReport(msg.sender, flightKey, FlightStatus(statusCode));
 
         if (
-            oracleResponses[key].responses[statusCode].length >=
+            oracleResponses[responseKey].responses[statusCode].length >=
             consortium.settings().ORACLE_CONSENSUS_RESPONSES()
         ) {
-            emit LogFlightStatus(
-                airline,
-                flight,
-                timestamp,
-                FlightStatus(statusCode)
-            );
+            emit LogFlightStatusResolved(flightKey, FlightStatus(statusCode));
 
-            _processFlightStatus(
-                key,
-                airline,
-                flight,
-                timestamp,
-                uint8(statusCode)
-            );
+            _processFlightStatus(responseKey, flightKey, uint8(statusCode));
         }
     }
 
     /**
-     * @dev Called after oracles have reached consensus on flight status
+     * @dev Called after oracles have reached consensus on flight status.
      */
-
     function _processFlightStatus(
         bytes32 responseKey,
-        address airline,
-        bytes32 flight,
-        uint256 timestamp,
+        bytes32 flightKey,
         uint8 statusCode
-    ) internal onlyValidFlight(airline, flight, timestamp) {
+    ) internal onlyValidFlight(flightKey) {
         FlightStatus status = FlightStatus(statusCode);
 
         require(
@@ -393,8 +320,6 @@ contract FlightInsuranceHandler is Ownable, AccessControl, PullPayment {
             "This flight status request has been resolved already"
         );
 
-        bytes32 flightKey = _getFlightKey(airline, flight, timestamp);
-
         flights[flightKey].status = status;
         oracleResponses[responseKey].isOpen = false;
 
@@ -404,7 +329,7 @@ contract FlightInsuranceHandler is Ownable, AccessControl, PullPayment {
             _creditConsortium(flightKey);
         }
 
-        emit LogFlightStatusProcessed(flightKey, airline, flight);
+        emit LogFlightStatusProcessed(flightKey);
     }
 
     /**
@@ -433,13 +358,21 @@ contract FlightInsuranceHandler is Ownable, AccessControl, PullPayment {
         }
     }
 
-    // ----------------- UTILITY -----------------
+    // --------------- MATH ---------------------------------------------------
     function _getFlightKey(
         address airline,
         bytes32 flight,
         uint256 timestamp
     ) internal pure returns (bytes32) {
         return keccak256(abi.encodePacked(airline, flight, timestamp));
+    }
+
+    function _getResponseKey(uint8 index, bytes32 flightKey)
+        internal
+        pure
+        returns (bytes32)
+    {
+        return keccak256(abi.encodePacked(index, flightKey));
     }
 
     function _generateIndexes(address account)
@@ -462,19 +395,10 @@ contract FlightInsuranceHandler is Ownable, AccessControl, PullPayment {
         return indexes;
     }
 
-    function _getResponseKey(
-        uint8 index,
-        address airline,
-        bytes32 flight,
-        uint256 timestamp
-    ) internal pure returns (bytes32) {
-        return keccak256(abi.encodePacked(index, airline, flight, timestamp));
-    }
-
     function _getRandomIndex(address account) internal returns (uint8) {
         uint8 maxValue = 10;
 
-        // Pseudo random number...the incrementing nonce adds variation
+        // Pseudo random number
         uint8 random = uint8(
             uint256(
                 keccak256(
@@ -484,7 +408,7 @@ contract FlightInsuranceHandler is Ownable, AccessControl, PullPayment {
         );
 
         if (nonce > 250) {
-            nonce = 0; // Can only fetch blockhashes for last 256 blocks so we adapt
+            nonce = 0; // Can only fetch blockhashes for the last 256 blocks
         }
 
         return random;

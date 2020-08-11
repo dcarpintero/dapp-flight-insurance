@@ -63,7 +63,7 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
     ConsortiumSettings public settings;
     uint8 private nonce = 0;
 
-    // ----------------- CONSORTIUM -----------------
+    // --------------- CONSORTIUM ---------------------------------------------
     struct OperationalConsensus {
         bool status;
         uint256 totalON;
@@ -79,7 +79,7 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
     }
     Consortium private consortium;
 
-    // ----------------- AFFILIATE -----------------
+    // --------------- AFFILIATE ----------------------------------------------
     enum MembershipStatus {REGISTERED, APPROVED, SEED_FUNDED, SUSPENDED}
 
     struct Affiliate {
@@ -92,7 +92,7 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
     }
     mapping(address => Affiliate) public affiliates;
 
-    // ----------------- INSURANCES -----------------
+    // --------------- INSURANCES ---------------------------------------------
     struct Insurance {
         address insuree;
         uint256 deposit;
@@ -100,7 +100,7 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
     }
     mapping(bytes32 => Insurance) private insurances;
 
-    // ----------------- EVENTS -----------------
+    // --------------- EVENTS -------------------------------------------------
     event LogDelegateRegistered(address _address);
 
     event LogAffiliateRegistered(address indexed affiliate, string title);
@@ -132,7 +132,7 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
 
     event LogKeyBurnt(bytes32 key);
 
-    // ----------------- MODIFIERS -----------------
+    // --------------- MODIFIERS ----------------------------------------------
 
     /**
      * @dev StopLoss if the contract balance is unexpected.
@@ -228,6 +228,9 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
         consortium.operational.status = true;
     }
 
+    /**
+     * @dev Add Delegate Role
+     */
     function addDelegateRole(address _address)
         external
         onlyAdmin
@@ -239,7 +242,7 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
         emit LogDelegateRegistered(_address);
     }
 
-    // ----------------- OPERATIONAL CONSENSUS -----------------
+    // --------------- OPERATIONAL CONSENSUS ----------------------------------
 
     /**
      * @dev Returns True if the contract functions are operational
@@ -308,7 +311,7 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
         consortium.operational.totalOFF = _value;
     }
 
-    // ----------------- AFFILIATE WORKFLOW -----------------
+    // --------------- AFFILIATE WORKFLOW -------------------------------------
 
     /**
      * @dev Let Admin add an Affiliate to the registration queue
@@ -398,7 +401,7 @@ contract ConsortiumAlliance is Ownable, AccessControl, PullPayment {
             settings.CONSORTIUM_CONSENSUS());
     }
 
-    // ----------------- INSURANCE CAPITAL AND PREMIUMS -----------------
+    // --------------- INSURANCE CAPITAL AND PREMIUMS -------------------------
     function depositMebership()
         external
         payable
