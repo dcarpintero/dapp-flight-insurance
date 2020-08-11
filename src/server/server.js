@@ -5,6 +5,7 @@ import FlightInsuranceHandler from '../../build/contracts/flightInsuranceHandler
 import Config from './config.json'
 import Web3 from 'web3'
 import express from 'express'
+import cors from 'cors'
 import regeneratorRuntime from 'regenerator-runtime'
 
 let config = Config['localhost']
@@ -49,17 +50,17 @@ const Backend = {
     console.log('Initializing airlines, flights and oracles...')
 
     this.registerAirline(WB, 'Wright Brothers').then((result) => {
-      this.registerFlight(WB, 'WB1111', date_f1)
-      this.registerFlight(WB, 'WB2222', date_f2)
+      this.registerFlight(WB, 'WRG', 'BRT', 'WB1111', date_f1)
+      this.registerFlight(WB, 'WRG', 'HRS', 'WB2222', date_f2)
     })
 
     this.registerAirline(KH, 'Kitty Hawk').then((result) => {
-      this.registerFlight(KH, 'KH3333', date_f3)
-      this.registerFlight(KH, 'KH4444', date_f4)
+      this.registerFlight(KH, 'KIT', 'TTY', 'KH3333', date_f3)
+      this.registerFlight(KH, 'KIT', 'HWK', 'KH4444', date_f4)
     })
 
     this.registerAirline(DC, 'De la Cierva').then((result) => {
-      this.registerFlight(DC, 'DC5555', date_f5)
+      this.registerFlight(DC, 'DEL', 'CRV', 'DC5555', date_f5)
     })
 
     await this.registerOracles()
@@ -95,7 +96,7 @@ const Backend = {
     })
   },
 
-  registerFlight: async function (_airline, _code, _timestamp) {
+  registerFlight: async function (_airline, _from, _to, _code, _timestamp) {
     let hexcode = web3.utils.utf8ToHex(_code)
     let key = web3.utils.soliditySha3(
       _airline,
@@ -115,6 +116,8 @@ const Backend = {
           code: _code,
           hexcode: hexcode,
           airline: _airline,
+          from: _from,
+          to: _to,
           timestamp: _timestamp,
         })
         console.log('\tFlight has been registered: ' + _code)
@@ -181,18 +184,18 @@ const Backend = {
       })
   },
 
-  requestFlightStatus: async function (airline, flight, timestamp) {
+  requestFlightStatus: async function (key) {
     let accounts = await web3.eth.getAccounts()
 
     insuranceHandler.methods
-      .requestFlightStatus(airline, flight, timestamp)
+      .requestFlightStatus(key)
       .send({ from: accounts[0] })
       .then((result) => {
-        console.log('Flight status has been requested:' + flight)
+        console.log('Flight status has been requested: ' + key)
       })
   },
 
-  sendOracleResponse: async function (key, index, airline, flight, timestamp) {
+  sendOracleResponse: async function (index, flightKey) {
     let totalResponses = 0
     const consensus = await settings.methods.ORACLE_CONSENSUS_RESPONSES().call()
 
@@ -202,13 +205,7 @@ const Backend = {
           // 2 is a LATE_AIRLINE status code
           try {
             await insuranceHandler.methods
-              .submitOracleResponse(
-                this.oracles[i].indexes[idx],
-                airline,
-                flight,
-                timestamp,
-                2,
-              )
+              .submitOracleResponse(this.oracles[i].indexes[idx], flightKey, 2)
               .send({
                 from: this.oracles[i].address,
                 gas: 4000000,
@@ -265,16 +262,20 @@ insuranceHandler.events.LogOracleReport({ fromBlock: 0 }, (error, event) => {
   }
 })
 
-insuranceHandler.events.LogFlightStatus({ fromBlock: 0 }, (error, event) => {
-  if (error) {
-    console.log('error:' + error)
-  } else {
-    console.log(
-      '\tConsensus has been reached for flight status: ' +
+insuranceHandler.events.LogFlightStatusResolved(
+  { fromBlock: 0 },
+  (error, event) => {
+    if (error) {
+      console.log('error:' + error)
+    } else {
+      console.log(
+        '\tConsensus has been reached for flight: %s and status: %i',
+        event.returnValues.flight,
         event.returnValues.status,
-    )
-  }
-})
+      )
+    }
+  },
+)
 
 insuranceHandler.events.LogFlightStatusRequested(
   { fromBlock: 0 },
@@ -282,13 +283,10 @@ insuranceHandler.events.LogFlightStatusRequested(
     if (error) {
       console.log('error:' + error)
     } else {
-      var key = event.returnValues.key
       var index = event.returnValues.index
-      var airline = event.returnValues.airline
-      var flight = event.returnValues.flight
-      var timestamp = event.returnValues.timestamp
+      var flightKey = event.returnValues.flight
 
-      Backend.sendOracleResponse(key, index, airline, flight, timestamp)
+      Backend.sendOracleResponse(index, flightKey)
     }
   },
 )
@@ -297,10 +295,11 @@ Backend.init()
 
 const app = express()
 app.use(express.json())
+app.use(cors())
 
 app.get('/', (req, res) => {
   res.json({
-    version: '0.1.0',
+    version: '0.5.0',
   })
 })
 
@@ -337,11 +336,9 @@ app.get('/flight/:key', (req, res) => {
 })
 
 app.get('/flight/:key/status', (req, res) => {
-  var airline = req.body.airline
-  var flight = req.body.hexcode
-  var timestamp = req.body.timestamp
+  var key = req.params.key
 
-  Backend.requestFlightStatus(airline, flight, timestamp)
+  Backend.requestFlightStatus(key)
   res.sendStatus(200)
 })
 
@@ -391,11 +388,13 @@ app.post('/insurance', async (req, res) => {
 
 app.get('/consortium', async (req, res) => {
   var address = config.dataAddress
+  var isOperational = await consortium.methods.isOperational().call()
   var balance = await consortium.methods.getConsortiumBalance().call()
   var escrow = await consortium.methods.getConsortiumEscrow().call()
 
   res.json({
     address: address,
+    isOperational: isOperational,
     balance: balance,
     escrow: escrow,
   })
