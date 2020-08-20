@@ -1,12 +1,13 @@
 import DOM from './dom'
-import Contract from './contract'
+import App from './app'
 import './flightsurety.css'
 ;(async () => {
   let result = null
 
-  let contract = new Contract('localhost', () => {
+  let app = new App('localhost', () => {
     /*
-    contract.fetchFlights((error, result) => {
+    app.fetchFlights((error, result) => {
+      console.log('index.js: fetchFlights')
       console.log(error, result)
 
       display('Flights', 'These are the flights', [
@@ -23,26 +24,60 @@ import './flightsurety.css'
       ])
     })*/
 
-    // User-submitted transaction
-    /*
-    DOM.elid('submit-oracle-old').addEventListener('click', () => {
-      let flight = DOM.elid('flight-number').value
-      // Write transaction
-      contract.fetchFlightStatus(flight, (error, result) => {
-        display('Oracles', 'Trigger oracles', [
-          {
-            label: 'Fetch Flight Status',
-            error: error,
-            value: result.flight + ' ' + result.timestamp,
-          },
-        ])
-      })
-    })*/
+    DOM.elid('load-flights').addEventListener('click', () => {
+      let flightsDiv = DOM.elid('flights-wrapper')
+      let section = DOM.section()
+
+      let row = section.appendChild(DOM.div({ className: 'row' }))
+      row.appendChild(DOM.div({ className: 'col-sm-2 field-header' }, 'Code'))
+      row.appendChild(DOM.div({ className: 'col-sm-1 field-header' }, 'From'))
+      row.appendChild(DOM.div({ className: 'col-sm-1 field-header' }, 'To'))
+      row.appendChild(DOM.div({ className: 'col-sm-1 field-header' }, 'Time'))
+      section.appendChild(row)
+
+      app
+        .getFlights()
+        .then((response) => {
+          return response.json()
+        })
+        .then((flights) => {
+          flights.map((flight) => {
+            let row = section.appendChild(DOM.div({ className: 'row' }))
+
+            row.appendChild(DOM.div({ className: 'col-sm-2' }, flight.code))
+            row.appendChild(DOM.div({ className: 'col-sm-1' }, flight.from))
+            row.appendChild(DOM.div({ className: 'col-sm-1' }, flight.to))
+            row.appendChild(
+              DOM.div(
+                { className: 'col-sm-4' },
+                new Date(flight.timestamp).toUTCString(),
+              ),
+            )
+            row.appendChild(
+              DOM.div(
+                { className: 'btn btn-primary', id: 'buy-insurance' },
+                'Buy Insurance',
+              ),
+            )
+            row.appendChild(row.appendChild(DOM.div({ className: 'col-sm-1' })))
+            row.appendChild(
+              DOM.div(
+                { className: 'btn btn-primary', id: 'claim-insurance' },
+                'Claim Insurance',
+              ),
+            )
+            section.appendChild(row)
+          })
+
+          flightsDiv.append(section)
+        })
+        .catch((error) => console.log(error))
+    })
 
     DOM.elid('submit-oracle').addEventListener('click', () => {
       let flight = DOM.elid('flight-number').value
       // Write transaction
-      contract.requestFlightStatus(flight, (error, result) => {
+      app.requestFlightStatus(flight, (error, result) => {
         display('Oracles', 'Trigger oracles', [
           {
             label: 'Fetch Flight Status',
@@ -55,7 +90,13 @@ import './flightsurety.css'
   })
 })()
 
+function flights() {
+  console.log('index.js: flights')
+}
+
 function display(title, description, results) {
+  console.log('index.js: display')
+
   let displayDiv = DOM.elid('display-wrapper')
   let section = DOM.section()
   section.appendChild(DOM.h2(title))

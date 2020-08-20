@@ -17,25 +17,21 @@
   <body>
     <nav class="navbar navbar-expand-md navbar-dark bg-dark fixed-top">
       <a class="navbar-brand" href="#">FlightSurety</a>
-      <button
-        class="navbar-toggler"
-        type="button"
-        data-toggle="collapse"
-        data-target="#navbarsExampleDefault"
-        aria-controls="navbarsExampleDefault"
-        aria-expanded="false"
-        aria-label="Toggle navigation"
-      >
-        <span class="navbar-toggler-icon"></span>
-      </button>
     </nav>
 
     <main class="container">
-      <div id="display-wrapper" class="top-20"></div>
+      <div id="display-wrapper" class="top-10"></div>
+      <div id="flights-wrapper" class="top-10"></div>
+
       <div class="row top-20">
         <label class="form">Flight</label>
         <input type="text" id="flight-number" />
         <btn class="btn btn-primary" id="submit-oracle">Check Status</btn>
+      </div>
+
+      <div class="row top-20">
+        <label class="form">Flight Status</label>
+        <btn class="btn btn-primary" id="load-flights">Load Flights</btn>
       </div>
     </main>
   </body>

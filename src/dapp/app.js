@@ -1,7 +1,7 @@
 import Config from './config.json'
 import Web3 from 'web3'
 
-export default class Contract {
+export default class App {
   constructor(network, callback) {
     let config = Config[network]
     this.web3 = new Web3(new Web3.providers.HttpProvider(config.url))
@@ -24,6 +24,11 @@ export default class Contract {
     this.fetchConsortium()
 
     callback()
+  }
+
+  getFlights() {
+    var URL = this.BASE_REST_API + '/flights'
+    return fetch(URL)
   }
 
   fetchAccounts() {
