@@ -31,6 +31,16 @@ export default class App {
     return fetch(URL)
   }
 
+  getInsurances() {
+    var URL = this.BASE_REST_API + '/insurances'
+    return fetch(URL)
+  }
+
+  getInsuree(address) {
+    var URL = this.BASE_REST_API + '/insuree/' + address
+    return fetch(URL)
+  }
+
   fetchAccounts() {
     this.web3.eth.getAccounts((error, accounts) => {
       this.accounts = accounts
