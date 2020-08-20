@@ -364,6 +364,15 @@ app.get('/insurances', async (req, res) => {
   res.json(Backend.insurances)
 })
 
+app.post('/insurance', async (req, res) => {
+  var passenger = req.body.passenger
+  var flight = req.body.flight
+  var fee = req.body.fee
+
+  await Backend.registerInsurance(passenger, flight, fee)
+  res.json(req.body)
+})
+
 app.get('/insuree/:address', async (req, res) => {
   var insuree = req.params.address
   var balance = await web3.eth.getBalance(insuree)
@@ -375,15 +384,6 @@ app.get('/insuree/:address', async (req, res) => {
       res.json({ address: insuree, balance: balance, premium: payments })
     }
   })
-})
-
-app.post('/insurance', async (req, res) => {
-  var passenger = req.body.passenger
-  var flight = req.body.flight
-  var fee = req.body.fee
-
-  await Backend.registerInsurance(passenger, flight, fee)
-  res.json(req.body)
 })
 
 app.get('/consortium', async (req, res) => {

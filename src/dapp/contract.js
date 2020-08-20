@@ -1,56 +1,120 @@
-import FlightSuretyApp from '../../build/contracts/FlightSuretyApp.json';
-import Config from './config.json';
-import Web3 from 'web3';
+import Config from './config.json'
+import Web3 from 'web3'
 
 export default class Contract {
-    constructor(network, callback) {
+  constructor(network, callback) {
+    console.log('Contract.js')
+    let config = Config[network]
+    this.web3 = new Web3(new Web3.providers.HttpProvider(config.url))
 
-        let config = Config[network];
-        this.web3 = new Web3(new Web3.providers.HttpProvider(config.url));
-        this.flightSuretyApp = new this.web3.eth.Contract(FlightSuretyApp.abi, config.appAddress);
-        this.initialize(callback);
-        this.owner = null;
-        this.airlines = [];
-        this.passengers = [];
-    }
+    this.initialize(callback)
+    this.accounts = []
+    this.airlines = []
+    this.flights = []
+    this.insurances = []
+    this.consortium = []
+    this.insuree = []
+  }
 
-    initialize(callback) {
-        this.web3.eth.getAccounts((error, accts) => {
-           
-            this.owner = accts[0];
+  initialize(callback) {
+    this.BASE_REST_API = 'http://localhost:3000'
+    this.fetchAccounts()
+    this.fetchAirlines()
+    this.fetchFlights()
+    this.fetchInsurances()
+    this.fetchConsortium()
 
-            let counter = 1;
-            
-            while(this.airlines.length < 5) {
-                this.airlines.push(accts[counter++]);
-            }
+    callback()
+  }
 
-            while(this.passengers.length < 5) {
-                this.passengers.push(accts[counter++]);
-            }
+  fetchAccounts() {
+    this.web3.eth.getAccounts((error, accounts) => {
+      this.accounts = accounts
+    })
+  }
 
-            callback();
-        });
-    }
+  fetchAirlines() {
+    var URL = this.BASE_REST_API + '/airlines'
 
-    isOperational(callback) {
-       let self = this;
-       self.flightSuretyApp.methods
-            .isOperational()
-            .call({ from: self.owner}, callback);
-    }
+    fetch(URL)
+      .then((response) => {
+        return response.json()
+      })
+      .then((airlines) => {
+        this.airlines = airlines
+        console.log('airlines:')
+        console.log(this.airlines)
+      })
+      .catch((error) => console.log(error))
+  }
 
-    fetchFlightStatus(flight, callback) {
-        let self = this;
-        let payload = {
-            airline: self.airlines[0],
-            flight: flight,
-            timestamp: Math.floor(Date.now() / 1000)
-        } 
-        self.flightSuretyApp.methods
-            .fetchFlightStatus(payload.airline, payload.flight, payload.timestamp)
-            .send({ from: self.owner}, (error, result) => {
-                callback(error, payload);
-            });
-    }
+  fetchFlights() {
+    var URL = this.BASE_REST_API + '/flights'
+
+    fetch(URL)
+      .then((response) => {
+        return response.json()
+      })
+      .then((flights) => {
+        this.flights = flights
+        console.log('flights:')
+        console.log(this.flights)
+      })
+      .catch((error) => console.log(error))
+  }
+
+  fetchInsurances() {
+    var URL = this.BASE_REST_API + '/insurances'
+
+    fetch(URL)
+      .then((response) => {
+        return response.json()
+      })
+      .then((insurances) => {
+        this.insurances = insurances
+        console.log('insurances:')
+        console.log(this.insurances)
+      })
+      .catch((error) => console.log(error))
+  }
+
+  fetchConsortium() {
+    var URL = this.BASE_REST_API + '/consortium'
+
+    fetch(URL)
+      .then((response) => {
+        return response.json()
+      })
+      .then((consortium) => {
+        this.consortium = consortium
+        console.log('consortium:')
+        console.log(this.consortium)
+      })
+      .catch((error) => console.log(error))
+  }
+
+  fetchInsuree(address) {
+    var URL = this.BASE_REST_API + '/insuree/' + address
+
+    fetch(URL)
+      .then((response) => {
+        return response.json()
+      })
+      .then((insuree) => {
+        this.insuree = insuree
+        console.log('insuree:')
+        console.log(this.insuree)
+      })
+      .catch((error) => console.log(error))
+  }
+
+  requestFlightStatus(key) {
+    var URL = this.BASE_REST_API + '/flight/' + key + '/status'
+
+    fetch(URL)
+      .then((response) => {
+        console.log('Flight status has been resolved, check insuree premium')
+      })
+      .catch((error) => console.log(error))
+  }
 }
