@@ -46,6 +46,11 @@ export default class App {
     return fetch(URL)
   }
 
+  getConsortium(address) {
+    var URL = this.BASE_REST_API + '/consortium'
+    return fetch(URL)
+  }
+
   fetchAccounts() {
     this.web3.eth.getAccounts((error, accounts) => {
       this.accounts = accounts

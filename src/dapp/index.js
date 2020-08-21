@@ -32,6 +32,7 @@ import './flightsurety.css'
   displayFlights(app)
   displayInsurances(app)
   displayAccount(app)
+  displayConsortium(app)
 })()
 
 function updateAccount(app) {
@@ -193,6 +194,48 @@ function displayAccount(app) {
       section.appendChild(row)
 
       accountDiv.append(section)
+    })
+    .catch((error) => console.log(error))
+}
+
+function displayConsortium(app) {
+  let consortiumDiv = DOM.elid('consortium-wrapper')
+  let section = DOM.section()
+
+  let row = section.appendChild(DOM.div({ className: 'row' }))
+  row.appendChild(DOM.div({ className: 'col-sm-5 field-header' }, 'Address'))
+  row.appendChild(DOM.div({ className: 'col-sm-1 field-header' }, 'Status'))
+  row.appendChild(DOM.div({ className: 'col-sm-2 field-header' }, 'Balance'))
+  row.appendChild(DOM.div({ className: 'col-sm-2 field-header' }, 'Escrow'))
+  section.appendChild(row)
+
+  app
+    .getConsortium()
+    .then((response) => {
+      return response.json()
+    })
+    .then((consortium) => {
+      let balance =
+        app.web3.utils.fromWei(consortium.balance.toString(), 'ether') + ' ETH'
+      let escrow =
+        app.web3.utils.fromWei(consortium.escrow.toString(), 'ether') + ' ETH'
+
+      let status = 'Operational'
+      if (!consortium.isOperational) status = 'Stopped'
+
+      let row = section.appendChild(DOM.div({ className: 'row' }))
+      row.appendChild(DOM.div({ className: 'col-sm-5' }, consortium.address))
+      row.appendChild(DOM.div({ className: 'col-sm-1' }, status))
+      row.appendChild(
+        DOM.div({ className: 'col-sm-2', id: 'consortium-balance' }, balance),
+      )
+      row.appendChild(
+        DOM.div({ className: 'col-sm-2', id: 'consortium-escrow' }, escrow),
+      )
+
+      section.appendChild(row)
+
+      consortiumDiv.append(section)
     })
     .catch((error) => console.log(error))
 }
