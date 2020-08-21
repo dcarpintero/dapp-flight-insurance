@@ -12,6 +12,10 @@ body {
   padding: 40px;
 }
 
+.top-10 {
+  margin-top: 10px;
+}
+
 .top-20 {
   margin-top: 20px;
 }
@@ -47,4 +51,12 @@ label.form {
 }
 input {
   margin-right: 30px;
+}
+
+.margin-20 {
+  margin-left: 0px;
+}
+
+.padding-10 {
+  margin-right: 10px;
 }

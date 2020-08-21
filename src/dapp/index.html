@@ -6,7 +6,7 @@
       name="viewport"
       content="width=device-width, initial-scale=1, shrink-to-fit=no"
     />
-    <title>FlightSurety</title>
+    <title>Flight Insurance Manager</title>
     <link
       href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.1.1/css/bootstrap.min.css"
       rel="stylesheet"
@@ -16,11 +16,14 @@
 
   <body>
     <nav class="navbar navbar-expand-md navbar-dark bg-dark fixed-top">
-      <a class="navbar-brand" href="#">FlightSurety</a>
+      <a class="navbar-brand" href="#">Ultimate Flight Insurance Manager</a>
     </nav>
 
     <main class="container">
       <div id="display-wrapper" class="top-10"></div>
+
+      <div class="h2">Consortium Airlines:</div>
+      <div id="airlines-wrapper" class="top-10"></div>
 
       <div class="h2">Consortium Flights:</div>
       <div id="flights-wrapper" class="top-10"></div>
@@ -29,11 +32,24 @@
       <div id="insurances-wrapper" class="top-10"></div>
 
       <div class="h2">My Account:</div>
+      <div class="row top-20 margin-20">
+        <btn class="btn btn-primary padding-10" id="update-account">
+          Update Account
+        </btn>
+        <btn class="btn btn-primary padding-10" id="withdraw-premium">
+          Withdraw Premium
+        </btn>
+      </div>
+
       <div id="account-wrapper" class="top-10"></div>
 
-      <div class="row top-20">
-        <label class="form">Flight Key</label>
-        <input type="text" id="flight-number" size="75px" />
+      <div class="row top-20 margin-20">
+        <input
+          type="text"
+          id="flight-number"
+          size="75px"
+          value="<Copy Flight Key 0x>"
+        />
         <btn class="btn btn-primary" id="submit-oracle">Claim Insurance</btn>
       </div>
     </main>

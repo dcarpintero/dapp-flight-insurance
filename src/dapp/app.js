@@ -36,6 +36,11 @@ export default class App {
     return fetch(URL)
   }
 
+  getAirlines() {
+    var URL = this.BASE_REST_API + '/airlines'
+    return fetch(URL)
+  }
+
   getInsuree(address) {
     var URL = this.BASE_REST_API + '/insuree/' + address
     return fetch(URL)

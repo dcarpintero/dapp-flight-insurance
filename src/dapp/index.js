@@ -18,12 +18,77 @@ import './flightsurety.css'
         ])
       })
     })
+
+    DOM.elid('update-account').addEventListener('click', () => {
+      updateAccount(app)
+    })
+
+    DOM.elid('withdraw-premium').addEventListener('click', () => {
+      withdrawPremium(app)
+    })
   })
 
+  displayAirlines(app)
   displayFlights(app)
   displayInsurances(app)
   displayAccount(app)
 })()
+
+function updateAccount(app) {
+  console.log('Update Account:')
+
+  app
+    .getInsuree('0xB0D2681581b9d96A033af74A2f3d403fC0F3837a')
+    .then((response) => {
+      return response.json()
+    })
+    .then((insuree) => {
+      let balance =
+        app.web3.utils.fromWei(insuree.balance.toString(), 'ether') + ' ETH'
+      let premium =
+        app.web3.utils.fromWei(insuree.premium.toString(), 'ether') + ' ETH'
+
+      console.log('\tbalance:' + balance)
+      console.log('\tpremium:' + premium)
+
+      DOM.elid('acc-balance').innerText = balance
+      DOM.elid('acc-premium').innerText = premium
+    })
+    .catch((error) => console.log(error))
+}
+
+function withdrawPremium(app) {
+  console.log('Withdraw Premium')
+
+  DOM.elid('acc-premium').innerText = '22'
+}
+
+function displayAirlines(app) {
+  let insurancesDiv = DOM.elid('airlines-wrapper')
+  let section = DOM.section()
+
+  let row = section.appendChild(DOM.div({ className: 'row' }))
+  row.appendChild(DOM.div({ className: 'col-sm-2 field-header' }, 'Title'))
+  row.appendChild(DOM.div({ className: 'col-sm-6 field-header' }, 'Address'))
+  section.appendChild(row)
+
+  app
+    .getAirlines()
+    .then((response) => {
+      return response.json()
+    })
+    .then((airlines) => {
+      airlines.map((airline) => {
+        let row = section.appendChild(DOM.div({ className: 'row' }))
+        row.appendChild(DOM.div({ className: 'col-sm-2' }, airline.title))
+        row.appendChild(DOM.div({ className: 'col-sm-6' }, airline.address))
+        section.appendChild(row)
+      })
+
+      insurancesDiv.append(section)
+    })
+    .catch((error) => console.log(error))
+}
 
 function displayFlights(app) {
   let flightsDiv = DOM.elid('flights-wrapper')
@@ -34,7 +99,7 @@ function displayFlights(app) {
   row.appendChild(DOM.div({ className: 'col-sm-1 field-header' }, 'From'))
   row.appendChild(DOM.div({ className: 'col-sm-1 field-header' }, 'To'))
   row.appendChild(DOM.div({ className: 'col-sm-2 field-header' }, 'Time'))
-  row.appendChild(DOM.div({ className: 'col-sm-4 field-header' }, 'Key'))
+  row.appendChild(DOM.div({ className: 'col-sm-4 field-header' }, 'Flight Key'))
   section.appendChild(row)
 
   app
@@ -71,9 +136,7 @@ function displayInsurances(app) {
 
   let row = section.appendChild(DOM.div({ className: 'row' }))
   row.appendChild(DOM.div({ className: 'col-sm-8 field-header' }, 'Flight Key'))
-  row.appendChild(
-    DOM.div({ className: 'col-sm-2 field-header' }, 'Deposit (wei)'),
-  )
+  row.appendChild(DOM.div({ className: 'col-sm-2 field-header' }, 'Deposit'))
   section.appendChild(row)
 
   app
@@ -83,11 +146,12 @@ function displayInsurances(app) {
     })
     .then((insurances) => {
       insurances.map((insurance) => {
+        let fee =
+          app.web3.utils.fromWei(insurance.fee.toString(), 'ether') + ' ETH'
+
         let row = section.appendChild(DOM.div({ className: 'row' }))
-
         row.appendChild(DOM.div({ className: 'col-sm-8' }, insurance.flight))
-        row.appendChild(DOM.div({ className: 'col-sm-2' }, insurance.fee))
-
+        row.appendChild(DOM.div({ className: 'col-sm-2' }, fee))
         section.appendChild(row)
       })
 
@@ -112,11 +176,19 @@ function displayAccount(app) {
       return response.json()
     })
     .then((insuree) => {
-      let row = section.appendChild(DOM.div({ className: 'row' }))
+      let balance =
+        app.web3.utils.fromWei(insuree.balance.toString(), 'ether') + ' ETH'
+      let premium =
+        app.web3.utils.fromWei(insuree.premium.toString(), 'ether') + ' ETH'
 
+      let row = section.appendChild(DOM.div({ className: 'row' }))
       row.appendChild(DOM.div({ className: 'col-sm-5' }, insuree.address))
-      row.appendChild(DOM.div({ className: 'col-sm-3' }, insuree.balance))
-      row.appendChild(DOM.div({ className: 'col-sm-3' }, insuree.premium))
+      row.appendChild(
+        DOM.div({ className: 'col-sm-3', id: 'acc-balance' }, balance),
+      )
+      row.appendChild(
+        DOM.div({ className: 'col-sm-3', id: 'acc-premium' }, premium),
+      )
 
       section.appendChild(row)
 
