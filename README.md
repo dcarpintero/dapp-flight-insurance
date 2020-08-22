@@ -56,10 +56,10 @@ Define mnemonic in .secret file
 truffle-config.js
 ```
 
-Launch Ganache with the same mnemonic and define 50 accounts
+Launch Ganache with the same mnemonic and define 50 accounts with 500 ETH each
 
 ```
-ganache-cli
+ganache-cli -m <mnemonic> -a 50 -e 500
 ```
 
 Compile, test and migrate
