@@ -6,13 +6,13 @@ export default class App {
     let config = Config[network]
     this.web3 = new Web3(new Web3.providers.HttpProvider(config.url))
 
-    this.initialize(callback)
     this.accounts = []
     this.airlines = []
     this.flights = []
     this.insurances = []
     this.consortium = []
     this.insuree = []
+    this.initialize(callback)
   }
 
   initialize(callback) {
@@ -46,9 +46,21 @@ export default class App {
     return fetch(URL)
   }
 
-  getConsortium(address) {
+  getDefaultInsureeAddress() {
+    return this.accounts[8]
+  }
+
+  getConsortium() {
     var URL = this.BASE_REST_API + '/consortium'
     return fetch(URL)
+  }
+
+  putPremium(address) {
+    var URL = this.BASE_REST_API + '/insuree/' + address + '/premium'
+
+    return fetch(URL, {
+      method: 'PUT',
+    })
   }
 
   fetchAccounts() {

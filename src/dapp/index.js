@@ -1,22 +1,13 @@
 import DOM from './dom'
 import App from './app'
+
 import './flightsurety.css'
 ;(async () => {
-  let result = null
-
   let app = new App('localhost', () => {
     DOM.elid('submit-oracle').addEventListener('click', () => {
       let flight = DOM.elid('flight-number').value
 
-      app.requestFlightStatus(flight, (error, result) => {
-        display('Oracles', 'Trigger oracles', [
-          {
-            label: 'Fetch Flight Status',
-            error: error,
-            value: result.flight + ' ' + result.timestamp,
-          },
-        ])
-      })
+      app.requestFlightStatus(flight, (error, result) => {})
     })
 
     DOM.elid('update-account').addEventListener('click', () => {
@@ -36,10 +27,10 @@ import './flightsurety.css'
 })()
 
 function updateAccount(app) {
-  console.log('Update Account:')
+  let insuree = app.getDefaultInsureeAddress()
 
   app
-    .getInsuree('0xB0D2681581b9d96A033af74A2f3d403fC0F3837a')
+    .getInsuree(insuree)
     .then((response) => {
       return response.json()
     })
@@ -59,9 +50,14 @@ function updateAccount(app) {
 }
 
 function withdrawPremium(app) {
-  console.log('Withdraw Premium')
+  let insuree = app.getDefaultInsureeAddress()
 
-  DOM.elid('acc-premium').innerText = '22'
+  app
+    .putPremium(insuree)
+    .then((response) => {
+      updateAccount(app)
+    })
+    .catch((error) => console.log(error))
 }
 
 function displayAirlines(app) {
@@ -171,31 +167,35 @@ function displayAccount(app) {
   row.appendChild(DOM.div({ className: 'col-sm-3 field-header' }, 'Premium'))
   section.appendChild(row)
 
-  app
-    .getInsuree('0xB0D2681581b9d96A033af74A2f3d403fC0F3837a')
-    .then((response) => {
-      return response.json()
-    })
-    .then((insuree) => {
-      let balance =
-        app.web3.utils.fromWei(insuree.balance.toString(), 'ether') + ' ETH'
-      let premium =
-        app.web3.utils.fromWei(insuree.premium.toString(), 'ether') + ' ETH'
+  app.web3.eth.getAccounts((error, accounts) => {
+    let insuree = accounts[8]
 
-      let row = section.appendChild(DOM.div({ className: 'row' }))
-      row.appendChild(DOM.div({ className: 'col-sm-5' }, insuree.address))
-      row.appendChild(
-        DOM.div({ className: 'col-sm-3', id: 'acc-balance' }, balance),
-      )
-      row.appendChild(
-        DOM.div({ className: 'col-sm-3', id: 'acc-premium' }, premium),
-      )
+    app
+      .getInsuree(insuree)
+      .then((response) => {
+        return response.json()
+      })
+      .then((insuree) => {
+        let balance =
+          app.web3.utils.fromWei(insuree.balance.toString(), 'ether') + ' ETH'
+        let premium =
+          app.web3.utils.fromWei(insuree.premium.toString(), 'ether') + ' ETH'
 
-      section.appendChild(row)
+        let row = section.appendChild(DOM.div({ className: 'row' }))
+        row.appendChild(DOM.div({ className: 'col-sm-5' }, insuree.address))
+        row.appendChild(
+          DOM.div({ className: 'col-sm-3', id: 'acc-balance' }, balance),
+        )
+        row.appendChild(
+          DOM.div({ className: 'col-sm-3', id: 'acc-premium' }, premium),
+        )
 
-      accountDiv.append(section)
-    })
-    .catch((error) => console.log(error))
+        section.appendChild(row)
+
+        accountDiv.append(section)
+      })
+      .catch((error) => console.log(error))
+  })
 }
 
 function displayConsortium(app) {

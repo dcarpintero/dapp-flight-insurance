@@ -146,6 +146,25 @@ const Backend = {
     }
   },
 
+  withdrawPremium: async function (passenger) {
+    if (web3.utils.isAddress(passenger)) {
+      consortium.methods
+        .withdrawPayments(passenger)
+        .send({ from: passenger, gas: 4000000 })
+        .then((result) => {
+          this.insurances.push({
+            passenger: passenger,
+            flight: flight,
+            fee: fee,
+          })
+          console.log('\tFlight Insurance has been registered')
+        })
+        .catch((error) => {
+          console.log('\tError while registering flight insurance: ' + error)
+        })
+    }
+  },
+
   registerOracles: async function () {
     let accounts = await web3.eth.getAccounts()
     const ORACLES_COUNT = 25
@@ -384,6 +403,16 @@ app.get('/insuree/:address', async (req, res) => {
       res.json({ address: insuree, balance: balance, premium: payments })
     }
   })
+})
+
+app.put('/insuree/:address/premium', async (req, res) => {
+  var insuree = req.params.address
+
+  var prevBalance = await web3.eth.getBalance(insuree)
+  await Backend.withdrawPremium(insuree)
+  var newBalance = await web3.eth.getBalance(insuree)
+
+  res.json({ prevBlance: prevBalance, newBalance: newBalance })
 })
 
 app.get('/consortium', async (req, res) => {
