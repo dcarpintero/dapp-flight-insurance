@@ -86,6 +86,14 @@ export default class App {
     return fetch(URL)
   }
 
+  putClaimInsurance(key) {
+    var URL = this.BASE_REST_API + '/flight/' + key + '/status'
+
+    return fetch(URL, {
+      method: 'PUT',
+    })
+  }
+
   fetchAccounts() {
     this.web3.eth.getAccounts((error, accounts) => {
       this.accounts = accounts

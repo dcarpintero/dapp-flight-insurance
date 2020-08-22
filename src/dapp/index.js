@@ -6,12 +6,6 @@ import './flightsurety.css'
   let app = new App('localhost', () => {
     Notification.requestPermission()
 
-    /*
-    DOM.elid('claim-insurance').addEventListener('click', () => {
-      let flight = DOM.elid('flight-number').value
-      claimInsurance(app, flight)
-    }) */
-
     DOM.elid('update-account').addEventListener('click', () => {
       updateAccount(app)
     })
@@ -27,7 +21,6 @@ import './flightsurety.css'
 
   displayAirlines(app)
   displayFlights(app)
-  //displayInsurances(app)
   displayAccount(app)
   displayConsortium(app)
 })()
@@ -42,7 +35,6 @@ function buyInsurance(app, flight) {
     .then((response) => response.json())
     .then((data) => {
       console.log('Insurance has been registered:', data)
-      new Notification('Insurance has been registered:' + data.flight)
 
       updateAccount(app)
       updateConsortium(app)
@@ -51,6 +43,8 @@ function buyInsurance(app, flight) {
       DOM.elid('claim-' + flight).addEventListener('click', () => {
         claimInsurance(app, flight)
       })
+
+      notify('Insurance has been registered', data.flight)
     })
     .catch((error) => {
       console.error('Error:', error)
@@ -58,24 +52,15 @@ function buyInsurance(app, flight) {
 }
 
 function claimInsurance(app, flight) {
+  DOM.elid('claim-' + flight).classList.remove('enabled-button')
   DOM.elid('claim-' + flight).classList.add('disabled-button')
 
   app
-    .getFlightStatus(flight)
-    .then((response) => {
-      console.log('Insurance has been claimed - response')
-
-      new Notification('Insurance has been registered')
-
-      updateAccount(app)
-      updateConsortium(app)
-    })
+    .putClaimInsurance(flight)
+    .then((response) => {})
     .then((data) => {
-      console.log('Insurance has been claimed - data')
-      new Notification('Insurance has been registered')
-
-      updateAccount(app)
-      updateConsortium(app)
+      console.log('Insurance has been claimed, update your accounts')
+      notify('Insurance has been claimed', 'You might update the accounts')
     })
     .catch((error) => console.log(error))
 }
@@ -89,6 +74,8 @@ function withdrawPremium(app) {
       console.log('Withdraw Premium - Updating accounts:')
       updateAccount(app)
       updateConsortium(app)
+
+      notify('The insurance premium is now in your balance')
     })
     .catch((error) => console.log(error))
 }
@@ -179,41 +166,6 @@ function displayFlights(app) {
           buyInsurance(app, flight.key)
         })
       })
-    })
-    .catch((error) => console.log(error))
-}
-
-function displayInsurances(app) {
-  let insurancesDiv = DOM.elid('insurances-wrapper')
-  let section = DOM.section()
-
-  let row = section.appendChild(DOM.div({ className: 'row' }))
-  row.appendChild(DOM.div({ className: 'col-sm-8 field-header' }, 'Flight Key'))
-  row.appendChild(DOM.div({ className: 'col-sm-2 field-header' }, 'Deposit'))
-  section.appendChild(row)
-
-  app
-    .getInsurances()
-    .then((response) => {
-      return response.json()
-    })
-    .then((insurances) => {
-      insurances.map((insurance) => {
-        let fee =
-          app.web3.utils.fromWei(insurance.fee.toString(), 'ether') + ' ETH'
-
-        let row = section.appendChild(DOM.div({ className: 'row' }))
-        row.appendChild(
-          DOM.div(
-            { className: 'col-sm-8', id: 'flight-key' },
-            insurance.flight,
-          ),
-        )
-        row.appendChild(DOM.div({ className: 'col-sm-2' }, fee))
-        section.appendChild(row)
-      })
-
-      insurancesDiv.append(section)
     })
     .catch((error) => console.log(error))
 }
@@ -323,8 +275,7 @@ function updateAccount(app) {
 
       DOM.elid('acc-balance').innerText = balance
       DOM.elid('acc-premium').innerText = premium
-      Notification.requestPermission()
-      new Notification('Your account has been updated')
+      //notify('Your account has been updated')
     })
     .catch((error) => console.log(error))
 }
@@ -353,7 +304,24 @@ function updateConsortium(app) {
       DOM.elid('consortium-balance').innerText = balance
       DOM.elid('consortium-escrow').innerText = escrow
 
-      new Notification('Consortium Account has been updated')
+      //notify('Consortium Account has been updated')
     })
     .catch((error) => console.log(error))
+}
+
+function notify(msg, body) {
+  var options = {
+    body: body,
+    tag: Date.now(),
+  }
+
+  if (Notification.permission === 'granted') {
+    var notification = new Notification(msg, options)
+  } else if (Notification.permission !== 'denied') {
+    Notification.requestPermission().then(function (permission) {
+      if (permission === 'granted') {
+        var notification = new Notification(msg, options)
+      }
+    })
+  }
 }

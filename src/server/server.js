@@ -354,11 +354,18 @@ app.get('/flight/:key', (req, res) => {
   })
 })
 
-app.get('/flight/:key/status', (req, res) => {
+app.get('/flight/:key/status', async (req, res) => {
   var key = req.params.key
 
-  Backend.requestFlightStatus(key)
+  await Backend.requestFlightStatus(key)
   res.sendStatus(200)
+})
+
+app.put('/flight/:key/status', async (req, res) => {
+  var key = req.params.key
+  await Backend.requestFlightStatus(key)
+
+  res.json({ flight: key })
 })
 
 app.get('/oracles', (req, res) => {
