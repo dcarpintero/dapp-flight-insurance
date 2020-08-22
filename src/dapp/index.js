@@ -176,8 +176,8 @@ function displayAccount(app) {
 
   let row = section.appendChild(DOM.div({ className: 'row' }))
   row.appendChild(DOM.div({ className: 'col-sm-5 field-header' }, 'Address'))
-  row.appendChild(DOM.div({ className: 'col-sm-3 field-header' }, 'Balance'))
-  row.appendChild(DOM.div({ className: 'col-sm-3 field-header' }, 'Premium'))
+  row.appendChild(DOM.div({ className: 'col-sm-2 field-header' }, 'Balance'))
+  row.appendChild(DOM.div({ className: 'col-sm-2 field-header' }, 'Premium'))
   section.appendChild(row)
 
   app.web3.eth.getAccounts((error, accounts) => {
@@ -197,10 +197,10 @@ function displayAccount(app) {
         let row = section.appendChild(DOM.div({ className: 'row' }))
         row.appendChild(DOM.div({ className: 'col-sm-5' }, insuree.address))
         row.appendChild(
-          DOM.div({ className: 'col-sm-3', id: 'acc-balance' }, balance),
+          DOM.div({ className: 'col-sm-2', id: 'acc-balance' }, balance),
         )
         row.appendChild(
-          DOM.div({ className: 'col-sm-3', id: 'acc-premium' }, premium),
+          DOM.div({ className: 'col-sm-2', id: 'acc-premium' }, premium),
         )
 
         section.appendChild(row)
@@ -217,9 +217,9 @@ function displayConsortium(app) {
 
   let row = section.appendChild(DOM.div({ className: 'row' }))
   row.appendChild(DOM.div({ className: 'col-sm-5 field-header' }, 'Address'))
-  row.appendChild(DOM.div({ className: 'col-sm-1 field-header' }, 'Status'))
   row.appendChild(DOM.div({ className: 'col-sm-2 field-header' }, 'Balance'))
   row.appendChild(DOM.div({ className: 'col-sm-2 field-header' }, 'Escrow'))
+  row.appendChild(DOM.div({ className: 'col-sm-1 field-header' }, 'Status'))
   section.appendChild(row)
 
   app
@@ -238,14 +238,15 @@ function displayConsortium(app) {
 
       let row = section.appendChild(DOM.div({ className: 'row' }))
       row.appendChild(DOM.div({ className: 'col-sm-5' }, consortium.address))
-      row.appendChild(
-        DOM.div({ className: 'col-sm-1', id: 'consortium-status' }, status),
-      )
+
       row.appendChild(
         DOM.div({ className: 'col-sm-2', id: 'consortium-balance' }, balance),
       )
       row.appendChild(
         DOM.div({ className: 'col-sm-2', id: 'consortium-escrow' }, escrow),
+      )
+      row.appendChild(
+        DOM.div({ className: 'col-sm-1', id: 'consortium-status' }, status),
       )
 
       section.appendChild(row)
