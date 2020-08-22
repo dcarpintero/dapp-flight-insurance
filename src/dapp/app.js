@@ -55,11 +55,29 @@ export default class App {
     return fetch(URL)
   }
 
-  putPremium(address) {
-    var URL = this.BASE_REST_API + '/insuree/' + address + '/premium'
+  putPremium(insuree) {
+    var URL = this.BASE_REST_API + '/insuree/' + insuree + '/premium'
 
     return fetch(URL, {
       method: 'PUT',
+    })
+  }
+
+  postInsurance(flight, insuree) {
+    const data = {
+      passenger: insuree,
+      flight: flight,
+      fee: 1000000000000000000,
+    }
+
+    var URL = this.BASE_REST_API + '/insurance'
+
+    return fetch(URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
     })
   }
 

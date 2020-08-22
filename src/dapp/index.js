@@ -4,10 +4,13 @@ import App from './app'
 import './flightsurety.css'
 ;(async () => {
   let app = new App('localhost', () => {
+    Notification.requestPermission()
+
+    /*
     DOM.elid('claim-insurance').addEventListener('click', () => {
       let flight = DOM.elid('flight-number').value
       claimInsurance(app, flight)
-    })
+    }) */
 
     DOM.elid('update-account').addEventListener('click', () => {
       updateAccount(app)
@@ -24,39 +27,53 @@ import './flightsurety.css'
 
   displayAirlines(app)
   displayFlights(app)
-  displayInsurances(app)
+  //displayInsurances(app)
   displayAccount(app)
   displayConsortium(app)
 })()
 
-function updateAccount(app) {
+function buyInsurance(app, flight) {
   let insuree = app.getDefaultInsureeAddress()
 
+  DOM.elid('buy-' + flight).classList.add('disabled-button')
+
   app
-    .getInsuree(insuree)
-    .then((response) => {
-      return response.json()
-    })
-    .then((insuree) => {
-      let balance =
-        app.web3.utils.fromWei(insuree.balance.toString(), 'ether') + ' ETH'
-      let premium =
-        app.web3.utils.fromWei(insuree.premium.toString(), 'ether') + ' ETH'
+    .postInsurance(flight, insuree)
+    .then((response) => response.json())
+    .then((data) => {
+      console.log('Insurance has been registered:', data)
+      new Notification('Insurance has been registered:' + data.flight)
 
-      console.log('Update Account:')
-      console.log('\tbalance:' + balance)
-      console.log('\tpremium:' + premium)
+      updateAccount(app)
+      updateConsortium(app)
 
-      DOM.elid('acc-balance').innerText = balance
-      DOM.elid('acc-premium').innerText = premium
+      DOM.elid('claim-' + flight).classList.add('enabled-button')
+      DOM.elid('claim-' + flight).addEventListener('click', () => {
+        claimInsurance(app, flight)
+      })
     })
-    .catch((error) => console.log(error))
+    .catch((error) => {
+      console.error('Error:', error)
+    })
 }
 
 function claimInsurance(app, flight) {
+  DOM.elid('claim-' + flight).classList.add('disabled-button')
+
   app
     .getFlightStatus(flight)
     .then((response) => {
+      console.log('Insurance has been claimed - response')
+
+      new Notification('Insurance has been registered')
+
+      updateAccount(app)
+      updateConsortium(app)
+    })
+    .then((data) => {
+      console.log('Insurance has been claimed - data')
+      new Notification('Insurance has been registered')
+
       updateAccount(app)
       updateConsortium(app)
     })
@@ -69,7 +86,9 @@ function withdrawPremium(app) {
   app
     .putPremium(insuree)
     .then((response) => {
+      console.log('Withdraw Premium - Updating accounts:')
       updateAccount(app)
+      updateConsortium(app)
     })
     .catch((error) => console.log(error))
 }
@@ -109,8 +128,9 @@ function displayFlights(app) {
   row.appendChild(DOM.div({ className: 'col-sm-1 field-header' }, 'Code'))
   row.appendChild(DOM.div({ className: 'col-sm-1 field-header' }, 'From'))
   row.appendChild(DOM.div({ className: 'col-sm-1 field-header' }, 'To'))
-  row.appendChild(DOM.div({ className: 'col-sm-2 field-header' }, 'Time'))
-  row.appendChild(DOM.div({ className: 'col-sm-4 field-header' }, 'Flight Key'))
+  row.appendChild(DOM.div({ className: 'col-sm-4 field-header' }, 'Time'))
+  //row.appendChild(DOM.div({ className: 'col-sm-2 field-header' }, 'Flight Key'))
+
   section.appendChild(row)
 
   app
@@ -120,23 +140,45 @@ function displayFlights(app) {
     })
     .then((flights) => {
       flights.map((flight) => {
-        let row = section.appendChild(DOM.div({ className: 'row' }))
-        let key = flight.key
+        let row = section.appendChild(DOM.div({ className: 'row top-10' }))
 
         row.appendChild(DOM.div({ className: 'col-sm-1' }, flight.code))
         row.appendChild(DOM.div({ className: 'col-sm-1' }, flight.from))
         row.appendChild(DOM.div({ className: 'col-sm-1' }, flight.to))
         row.appendChild(
           DOM.div(
-            { className: 'col-sm-2' },
+            { className: 'col-sm-4' },
             new Date(flight.timestamp).toUTCString(),
           ),
         )
-        row.appendChild(DOM.div({ className: 'col-sm-4' }, flight.key))
+        //row.appendChild(DOM.div({ className: 'col-sm-2, key' }, flight.key))
+        row.appendChild(
+          DOM.div(
+            {
+              className: 'btn btn-primary padding-10 ',
+              id: 'buy-' + flight.key,
+            },
+            'Buy Insurance',
+          ),
+        )
+        row.appendChild(
+          DOM.div(
+            {
+              className: 'btn btn-warning disabled-button',
+              id: 'claim-' + flight.key,
+            },
+            'Claim Insurance',
+          ),
+        )
         section.appendChild(row)
       })
-
       flightsDiv.append(section)
+
+      flights.map((flight) => {
+        DOM.elid('buy-' + flight.key).addEventListener('click', () => {
+          buyInsurance(app, flight.key)
+        })
+      })
     })
     .catch((error) => console.log(error))
 }
@@ -161,7 +203,12 @@ function displayInsurances(app) {
           app.web3.utils.fromWei(insurance.fee.toString(), 'ether') + ' ETH'
 
         let row = section.appendChild(DOM.div({ className: 'row' }))
-        row.appendChild(DOM.div({ className: 'col-sm-8' }, insurance.flight))
+        row.appendChild(
+          DOM.div(
+            { className: 'col-sm-8', id: 'flight-key' },
+            insurance.flight,
+          ),
+        )
         row.appendChild(DOM.div({ className: 'col-sm-2' }, fee))
         section.appendChild(row)
       })
@@ -256,6 +303,32 @@ function displayConsortium(app) {
     .catch((error) => console.log(error))
 }
 
+function updateAccount(app) {
+  let insuree = app.getDefaultInsureeAddress()
+
+  app
+    .getInsuree(insuree)
+    .then((response) => {
+      return response.json()
+    })
+    .then((insuree) => {
+      let balance =
+        app.web3.utils.fromWei(insuree.balance.toString(), 'ether') + ' ETH'
+      let premium =
+        app.web3.utils.fromWei(insuree.premium.toString(), 'ether') + ' ETH'
+
+      console.log('Update Account:')
+      console.log('\tbalance:' + balance)
+      console.log('\tpremium:' + premium)
+
+      DOM.elid('acc-balance').innerText = balance
+      DOM.elid('acc-premium').innerText = premium
+      Notification.requestPermission()
+      new Notification('Your account has been updated')
+    })
+    .catch((error) => console.log(error))
+}
+
 function updateConsortium(app) {
   app
     .getConsortium()
@@ -279,6 +352,8 @@ function updateConsortium(app) {
       DOM.elid('consortium-status').innerText = status
       DOM.elid('consortium-balance').innerText = balance
       DOM.elid('consortium-escrow').innerText = escrow
+
+      new Notification('Consortium Account has been updated')
     })
     .catch((error) => console.log(error))
 }
