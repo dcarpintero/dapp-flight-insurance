@@ -63,6 +63,11 @@ export default class App {
     })
   }
 
+  getFlightStatus(key) {
+    var URL = this.BASE_REST_API + '/flight/' + key + '/status'
+    return fetch(URL)
+  }
+
   fetchAccounts() {
     this.web3.eth.getAccounts((error, accounts) => {
       this.accounts = accounts

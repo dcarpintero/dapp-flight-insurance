@@ -4,10 +4,9 @@ import App from './app'
 import './flightsurety.css'
 ;(async () => {
   let app = new App('localhost', () => {
-    DOM.elid('submit-oracle').addEventListener('click', () => {
+    DOM.elid('claim-insurance').addEventListener('click', () => {
       let flight = DOM.elid('flight-number').value
-
-      app.requestFlightStatus(flight, (error, result) => {})
+      claimInsurance(app, flight)
     })
 
     DOM.elid('update-account').addEventListener('click', () => {
@@ -16,6 +15,10 @@ import './flightsurety.css'
 
     DOM.elid('withdraw-premium').addEventListener('click', () => {
       withdrawPremium(app)
+    })
+
+    DOM.elid('update-consortium').addEventListener('click', () => {
+      updateConsortium(app)
     })
   })
 
@@ -40,11 +43,22 @@ function updateAccount(app) {
       let premium =
         app.web3.utils.fromWei(insuree.premium.toString(), 'ether') + ' ETH'
 
+      console.log('Update Account:')
       console.log('\tbalance:' + balance)
       console.log('\tpremium:' + premium)
 
       DOM.elid('acc-balance').innerText = balance
       DOM.elid('acc-premium').innerText = premium
+    })
+    .catch((error) => console.log(error))
+}
+
+function claimInsurance(app, flight) {
+  app
+    .getFlightStatus(flight)
+    .then((response) => {
+      updateAccount(app)
+      updateConsortium(app)
     })
     .catch((error) => console.log(error))
 }
@@ -225,7 +239,9 @@ function displayConsortium(app) {
 
       let row = section.appendChild(DOM.div({ className: 'row' }))
       row.appendChild(DOM.div({ className: 'col-sm-5' }, consortium.address))
-      row.appendChild(DOM.div({ className: 'col-sm-1' }, status))
+      row.appendChild(
+        DOM.div({ className: 'col-sm-1', id: 'consortium-status' }, status),
+      )
       row.appendChild(
         DOM.div({ className: 'col-sm-2', id: 'consortium-balance' }, balance),
       )
@@ -236,6 +252,33 @@ function displayConsortium(app) {
       section.appendChild(row)
 
       consortiumDiv.append(section)
+    })
+    .catch((error) => console.log(error))
+}
+
+function updateConsortium(app) {
+  app
+    .getConsortium()
+    .then((response) => {
+      return response.json()
+    })
+    .then((consortium) => {
+      let balance =
+        app.web3.utils.fromWei(consortium.balance.toString(), 'ether') + ' ETH'
+      let escrow =
+        app.web3.utils.fromWei(consortium.escrow.toString(), 'ether') + ' ETH'
+
+      let status = 'Operational'
+      if (!consortium.isOperational) status = 'Stopped'
+
+      console.log('Update Consortium:')
+      console.log('\tbalance:' + balance)
+      console.log('\tescrow:' + escrow)
+      console.log('\tstatus:' + status)
+
+      DOM.elid('consortium-status').innerText = status
+      DOM.elid('consortium-balance').innerText = balance
+      DOM.elid('consortium-escrow').innerText = escrow
     })
     .catch((error) => console.log(error))
 }
