@@ -207,7 +207,7 @@ const Backend = {
       .requestFlightStatus(key)
       .send({ from: accounts[0] })
       .then((result) => {
-        console.log("Flight status has been requested: " + key);
+        console.log("\tFlight status has been requested: " + key);
       });
   },
 
