@@ -84,3 +84,7 @@ npm run dapp
 http://localhost:8000
 
 ```
+
+## Frontend
+
+<p align="center"><img src="/doc/insurance_manager_frontend" /></p>
