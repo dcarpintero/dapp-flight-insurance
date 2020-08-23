@@ -2,7 +2,7 @@
 
 ## Project Description
 
-Decentralized application aimed at providing passengers' insurance. A consortium of airlines fund an insurance deposit and guarantee premiums, which are credited to insurees upon oracle consensus on flight status. Unreedemable insurances are credited to the shared consortium account.
+Decentralized application aimed at providing flight passengers' insurance. A consortium of airlines fund an insurance deposit and guarantee premiums. Insurance premiums are credited to insurees upon oracle consensus on flight status. Unreedemable insurance deposits are credited to the shared consortium account.
 
 ### Security
 
@@ -13,13 +13,13 @@ Decentralized application aimed at providing passengers' insurance. A consortium
 
 ### Design and Upgradability
 
-- ConsortiumAlliance module aims at providing a generic insurance data model and fine operations for implementing affiliate registrations, voting rights, custody and management of insurance deposits.
+- ConsortiumAlliance contract module aims at providing a generic insurance data model as well as fine operations for implementing affiliate registrations, voting rights, custody and management of insurance deposits.
 
 - ConsortiumSettings defines the project roles, consensus criteria and administrative fees of the project.
 
 - FlightInsuranceHandler is concerned with the specific business logic of airlines', flights' and insurances registration. As a trusted delegate of the ConsortiumAlliance, it triggers the credit of insurance deposits and premiums upon Oracle consensus on flight status.
 
-- A Express.js server application provides a REST API to interact with the contracts and register airlines, flights, oracles and insurances.
+- A Express.js server application provides a REST API to interact with the contracts. It allows withdraw of insurance premiums and registration of airlines, flights, oracles and insurances.
 
 ### Unit and system tests
 
@@ -56,10 +56,10 @@ Define mnemonic in .secret file
 truffle-config.js
 ```
 
-Launch Ganache with the same mnemonic and define 50 accounts with 500 ETH each
+Launch Ganache with the same mnemonic and define 50 accounts with 100 ETH each
 
 ```
-ganache-cli -m <mnemonic> -a 50 -e 500
+ganache-cli -m <mnemonic> -a 50 -e 100
 ```
 
 Compile, test and migrate
@@ -70,7 +70,7 @@ truffle test
 truffle migrate --reset
 ```
 
-Launch the Server
+Launch the Server (it registers founding airlines, flights and oracles)
 
 ```
 npm run server
