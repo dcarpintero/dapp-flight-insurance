@@ -1,4 +1,4 @@
-# Insurance Consortium
+# Decentralized Flight Insurance
 
 ## Project Description
 
